@@ -26,3 +26,6 @@ micro_tests/
 slurm-*.out
 */pynamic_sdb_pyMPI_initialize.c
 !*libmodulefinal.c
+/.idea
+/.venv
+/venv
