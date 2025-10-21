@@ -1,5 +1,5 @@
-#
-# FILE: pynamic.README
+<!--
+# FILE: README.md
 #
 # Updates:
 #          Nov 05 2021 MPL: Add support for python3 when built with mpi4py
@@ -34,23 +34,19 @@
 #			    and Linux/x86-64 support
 #				
 #
-#
+-->
 
-		Table Of Contents
-		=================
+## Table Of Contents
 
-1. OVERVIEW
+1. [OVERVIEW](#overview)
+2. [METHOD OF SOLUTION](#method-of-solution) 
+3. [HOW TO BUILD AND TEST](#how-to-build-and-test)
+   - [TO BUILD](#to-build)
+   - [TO TEST](#to-test)
+4. [CONTACTS](#contacts)
 
-2. METHOD OF SOLUTION
-
-3. HOW TO BUILD AND TEST
-   3.1 TO BUILD
-   3.2 TO TEST
-
-4. CONTACTS
-
---------------------------------------------------------
-1. OVERVIEW
+---
+### OVERVIEW
   Pynamic is a benchmark designed to test a system's ability
   to handle the Dynamic Linking and Loading requirements
   of Python-based scientific applications. This benchmark
@@ -76,8 +72,8 @@
   DLL operations have hindered certain HPC code development
   tools, notably parallel debuggers, from performing optimally.
 
---------------------------------------------------------
-2. METHOD OF SOLUTION
+---
+### METHOD OF SOLUTION
   The heart of Pynamic is a Python script that generates C files
   and compiles them into shared object libraries.  Each library
   contains a Python callable entry function as well as a number
@@ -93,15 +89,16 @@
   per module and the function signatures, thus ensuring some
   heterogeneity of the libraries and functions.
 
---------------------------------------------------------
-3. HOW TO BUILD AND TEST
+---
+### HOW TO BUILD AND TEST
 
 If you are building pynamic against a Python version 2, then pynamic will
 build against its included pympi implementation.  If you are building
 against Python version 3, then pynamic will use mpi4py, which must be loaded
 into an existing python3 environment.
 
-  3.1 To BUILD
+#### To BUILD
+```
     % cd pynamic-pyMPI-2.6a1
     % config_pynamic.py
 
@@ -158,107 +155,124 @@ into an existing python3 environment.
               Build against mpi4py rather than pyMPI.  This requires the backing
               python to have the mpi4py module installed, and is default when
               building pynamic with Python3+.
+```
+---
 
+Building a large number of shared objects may take a long time, in
+which case it is advised to compiler those files in parallel using
+the -j option, setting the value to the number of cores on the node.
 
-    --------------------------------------------------------
+Options and arguments are provided so that a tester can model certain
+static properties of a Python-based scientific applications.
+For example, if the tester wants to model a code that has
+following properties (this was actually taken from an important
+LLNL application),
+```
++ Number of shared libraries: ~900
+  - Python callable C-extension libraries: ~550
+  - Utility libraries (python "uncallable"): ~(900-550)=350
 
-    Building a large number of shared objects may take a long time, in
-    which case it is advised to compiler those files in parallel using
-    the -j option, setting the value to the number of cores on the node.
++ Aggregate total of shared libraries: 2.3GB
+  - Aggregate text size of shared libraries: 619.4MB
+  - Aggregate data size of shared libraries: 17.3MB
+  - Aggregate debug section size of shared libraries: 1.4GB
+  - Aggregate symbol table size of shared libraries: 44.4MB
+  - Aggregate string table size of shared libraries: 196.1MB
+```
+a tester may use:
+```bash
+config_pynamic.py 900 1250 -e -u 350 1250 -n 150
+````
 
-    Options and arguments are provided so that a tester can model certain
-    static properties of a Python-based scientific applications.
-    For example, if the tester wants to model a code that has
-    following properties (this was actually taken from an important
-    LLNL application),
+Please examine other options to model a target code better.
 
-    + Number of shared libraries: ~900
-      - Python callable C-extension libraries: ~550
-      - Utility libraries (python "uncallable"): ~(900-550)=350
+When a Pynamic build is complete, it prints out a summary
+message about the static properties for each generated executable.
 
-    + Aggregate total of shared libraries: 2.3GB
-      - Aggregate text size of shared libraries: 619.4MB
-      - Aggregate data size of shared libraries: 17.3MB
-      - Aggregate debug section size of shared libraries: 1.4GB
-      - Aggregate symbol table size of shared libraries: 44.4MB
-      - Aggregate string table size of shared libraries: 196.1MB
+```
+summary of pynamic-pyMPI executable and 914 shared libraries
+Size of aggregate total of shared libraries: 2.1GB
+Size of aggregate texts of shared libraries: 694.6MB
+Size of aggregate data of shared libraries: 18.1MB
+Size of aggregate debug sections of shared libraries: 1.1GB
+Size of aggregate symbol tables of shared libraries: 45.6MB
+Size of aggregate string table size of shared libraries: 311.2MB
+```
 
-    a tester may use:
-      % config_pynamic.py 900 1250 -e -u 350 1250 -n 150
+When more details on static properties for individual
+shared libraries are desired, please look into the full report:
+"sharedlib_section_info_<exe_name>"
 
-    Please examine other options to model a target code better.
+##### WITH PYTHON2 AND PYMPI:
 
-    When a Pynamic build is complete, it prints out a summary
-    message about the static properties for each generated executable.
+Pynamic creates 3 executables: 
+1. pyMPI
+   - which is a vanilla pyMPI that must dlopen imported modules;
+2. pynamic-pyMPI
+   - which is dynamically linked to the generated modules and utility libraries; 
+3. pynamic-sdb-pyMPI
+   - which statically links in the generated modules and utility libraries.\
 
-    ************************************************
-    summary of pynamic-pyMPI executable and 914 shared libraries
-    Size of aggregate total of shared libraries: 2.1GB
-    Size of aggregate texts of shared libraries: 694.6MB
-    Size of aggregate data of shared libraries: 18.1MB
-    Size of aggregate debug sections of shared libraries: 1.1GB
-    Size of aggregate symbol tables of shared libraries: 45.6MB
-    Size of aggregate string table size of shared libraries: 311.2MB
-    ************************************************
+An optional 4th pynamic-bigexe-pyMPI and 5th pynamic-bigexe-sdb-pyMPI
+executable can be built with the -b option, which is equivalent to
+pynamic-pyMPI and pynamic-sdb-pyMPI respectively, but with extra code to
+make the base executable much larger (this may take a long time to compile).
 
-    When more details on static properties for individual
-    shared libraries are desired, please look into the full report:
-    "sharedlib_section_info_<exe_name>"
+##### WITH PYTHON3+ AND MPI4PY:
 
-    WITH PYTHON2 AND PYMPI:
-    
-    Pynamic creates 3 executables: 1. pyMPI, which is a vanilla pyMPI that
-    must dlopen imported modules; 2. pynamic-pyMPI, which is dynamically
-    linked to the generated modules and utility libraries; 3. pynamic-sdb-pyMPI,
-    which statically links in the generated modules and utility libraries.
-    An optional 4th pynamic-bigexe-pyMPI and 5th pynamic-bigexe-sdb-pyMPI
-    executable can be built with the -b option, which is equivalent to
-    pynamic-pyMPI and pynamic-sdb-pyMPI respectively, but with extra code to
-    make the base executable much larger (this may take a long time to compile).
+Pynamic creates one executable pynamic-mpi4py, which is dynamically
+linked to the generated modules and utility libraries.  Optionally,
+pynamic can be configured to create a pynamic-bigexe-mpi4py with the
+-b option to configure.
 
-    WITH PYTHON3+ AND MPI4PY:
+#### TO TEST
 
-    Pynamic creates one executable pynamic-mpi4py, which is dynamically
-    linked to the generated modules and utility libraries.  Optionally,
-    pynamic can be configured to create a pynamic-bigexe-mpi4py with the
-    -b option to configure.
+##### WITH PYTHON2 AND PYMPI
 
-  3.1 TO TEST
+```bash
+python pynamic_driver.py `date +%s`
+```
 
-    WITH PYTHON2 AND PYMPI:
+```bash
+srun pyMPI pynamic_driver.py `date +%s`
+```
 
-    % python pynamic_driver.py `date +%s`
+```bash
+srun pynamic-pyMPI pynamic_driver.py `date +%s`
+```
 
-      or in a batchxterm:
+```bash
+srun pynamic-sdb-pyMPI pynamic_driver.py `date +%s`
+```
 
-    % srun pyMPI pynamic_driver.py `date +%s`
+```bash
+srun pynamic-bigexe pynamic_driver.py `date +%s`
+```
 
-    % srun pynamic-pyMPI pynamic_driver.py `date +%s`
+> ***Note*** 
+> Pynamic creates 3 executables:
+>  - pyMPI - a vanilla pyMPI build
+>  - pynamic-pyMPI - pyMPI with the generated .so's linked in
+>  - pynamic-sdb-pyMPI - pyMPI with the generated libraries statically linked in and 2 optional executables (with the -b flag)
+>  - pynamic-bigexe-pyMPI - a larger pyMPI with the generated .so's linked in
+>  - pynamic-bigexe-sdb-pyMPI - a larger pyMPI with the generated libraries staically linked in
 
-    % srun pynamic-sdb-pyMPI pynamic_driver.py `date +%s`
+##### WITH PYTHON3+ AND MPI4PY
 
-    % srun pynamic-bigexe pynamic_driver.py `date +%s`
+```bash
+srun pynamic-mpi4py `date +%s`
+```
+```bash
+srun pynamic-bigexe-mpi4py `date +%s`
+```
+---
 
-    # note: Pynamic creates 3 executables:
-    #    pyMPI - a vanilla pyMPI build
-    #    pynamic-pyMPI - pyMPI with the generated .so's linked in
-    #    pynamic-sdb-pyMPI - pyMPI with the generated libraries statically linked in
-    # and 2 optional executables (with the -b flag)
-    #    pynamic-bigexe-pyMPI - a larger pyMPI with the generated .so's linked in
-    #    pynamic-bigexe-sdb-pyMPI - a larger pyMPI with the generated libraries staically linked in
+### CONTACTS
+Greg Lee <lee218@llnl.gov>  
+Dong Ahn <ahn1@llnl.gov>  
+Bronis de Supinski <desupinski1@llnl.gov>  
+John Gyllenhaal <gyllenhaal1@llnl.gov>  
 
-    WITH PYTHON3+ AND MPI4PY:
-
-    % srun pynamic-mpi4py `date +%s`
-
-    % srun pynamic-bigexe-mpi4py `date +%s`
-    
---------------------------------------------------------
-4. CONTACTS
-   Greg Lee <lee218@llnl.gov>	
-   Dong Ahn <ahn1@llnl.gov>
-   Bronis de Supinski <desupinski1@llnl.gov>
-   John Gyllenhaal <gyllenhaal1@llnl.gov>
 
 
 
