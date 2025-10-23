@@ -19,6 +19,7 @@ import argparse
 from pathlib import Path
 import random
 import multiprocessing as mp
+import subprocess
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate Pynamic shared libraries and configure/build', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -199,7 +200,7 @@ def generate_module_file(extern_list: list, utility_list: list, identity: int, a
             c_file.write(create_function_declaration(filename + "_extern", extern_list[identity]))
             c_file.write(f"\n{{\n\t{extern_list[identity][0]} ret_val;")
             if print:
-                c_file.write(f"\tprintf('I am {filename}_extern called from another module\\n');\n")
+                c_file.write(f"\tprintf(\"I am {filename}_extern called from another module\\n\");\n")
             c_file.write('\treturn ret_val;\n}\n\n')
 
         # Create Function Declarations
@@ -267,6 +268,20 @@ def generate_module_file(extern_list: list, utility_list: list, identity: int, a
         c_file.write(f"\t\t{filename}Methods\n\t}};\n")
         c_file.write("\treturn PyModule_Create(&mod);\n}\n\n")
 
+def configure_and_build_libraries():
+    command = ['cmake -S gen_src -B build']
+    try:
+        subprocess.run(command)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        sys.exit(1)
+
+    command = ['cmake --build build']
+    try:
+        subprocess.run(command)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        sys.exit(1)
+
+
 def generate_shared_objects(parser):
     utility_list = []
     extern_list = []
@@ -291,9 +306,11 @@ def generate_shared_objects(parser):
             py_header.write(f"void initlibmodule{index}();\n")
         py_header.write("void initlibmodulefinal();\n")
 
+
     # TODO: Compile util
     # TODO: Compile libmodulefinal.c libmodulebegin.c
     # TODO: Compile modules
+    # configure_and_build_libraries()
     # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
     # TODO: Edit the pynamic_sdb file #so_generator.py:423
     # TODO: Create mpi4py driver file
@@ -318,48 +335,49 @@ def configure(parser):
     os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
     os.environ["PYTHON_EXE"] = str(parser.with_python)
 
-    pass
+    # TODO: Run make clean on Makefile.mpi4py
     # command = 'make -f Makefile.mpi4py clean'
     # run_command(command)
-    #
+
     # target = 'pynamic-mpi4py'
     # if parser.big_exe == True:
     #     target += ' pynamic-bigexe-mpi4py'
+    # TODO: Run make on Makefile.mpi4py with targets as pynamic and big_exe
     # command = 'make -j ' + str(processes) + ' -f Makefile.mpi4py ' + target
     # run_command(command)
+    return
+    if bigexe == False:
+        command = 'rm -f pynamic-bigexe-pyMPI pynamic-bigexe-sdb-pyMPI pynamic-bigexe-mpi4py'
+        run_command(command, False)
+
     #
-    # if bigexe == False:
-    #     command = 'rm -f pynamic-bigexe-pyMPI pynamic-bigexe-sdb-pyMPI pynamic-bigexe-mpi4py'
-    #     run_command(command, False)
+    # build the addall utility program
     #
-    # #
-    # # build the addall utility program
-    # #
-    # if os.path.exists('pynamic-pyMPI-2.6a1/addall.c') != True:
-    #     print_error('required file addall.c not found!')
-    #     sys.exit(0)
+    if os.path.exists('pynamic-pyMPI-2.6a1/addall.c') != True:
+        print_error('required file addall.c not found!')
+        sys.exit(0)
+
+    command = "gcc -g addall.c -o addall"
+    run_command(command)
+
     #
-    # command = "gcc -g addall.c -o addall"
-    # run_command(command)
+    # check DBG, text, symbol table, and string table size.
     #
-    # #
-    # # check DBG, text, symbol table, and string table size.
-    # #
-    # if os.path.exists('pynamic-pyMPI-2.6a1/get-symtab-sizes') != True:
-    #     print_error('required file get-symtab-sizes not found!')
-    #     sys.exit(0)
-    #
-    # for exe in ['pynamic-pyMPI', 'pynamic-sdb-pyMPI', 'pynamic-bigexe-pyMPI', 'pynamic-bigexe-sdb-pyMPI', 'pynamic-mpi4py', 'pynamic-bigexe-mpi4py']:
-    #     info_file = 'sharedlib_section_info_%s' %(exe)
-    #     os.system('rm -f %s' %(info_file))
-    #     if os.path.exists(exe):
-    #         command = "./get-symtab-sizes %s > %s" %(exe, info_file)
-    #         ret = run_command(command)
-    #         if ret != 0:
-    #             print_error('Failed to get executable statistics for %s!' %(exe))
-    #         else:
-    #             command = "tail -10 %s" %(info_file)
-    #             run_command(command)
+    if os.path.exists('pynamic-pyMPI-2.6a1/get-symtab-sizes') != True:
+        print_error('required file get-symtab-sizes not found!')
+        sys.exit(0)
+
+    for exe in ['pynamic-pyMPI', 'pynamic-sdb-pyMPI', 'pynamic-bigexe-pyMPI', 'pynamic-bigexe-sdb-pyMPI', 'pynamic-mpi4py', 'pynamic-bigexe-mpi4py']:
+        info_file = 'sharedlib_section_info_%s' %(exe)
+        os.system('rm -f %s' %(info_file))
+        if os.path.exists(exe):
+            command = "./get-symtab-sizes %s > %s" %(exe, info_file)
+            ret = run_command(command)
+            if ret != 0:
+                print_error('Failed to get executable statistics for %s!' %(exe))
+            else:
+                command = "tail -10 %s" %(info_file)
+                run_command(command)
 
 if __name__ == '__main__':
     configure(parse_args())
