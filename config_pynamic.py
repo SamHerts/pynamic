@@ -76,7 +76,7 @@ def clean_pynamic_files() -> None:
     Raises:
         OSError: If issues occur during file deletion.
     """
-    top_dir = Path('.')
+    top_dir = Path('./gen_src')
     for file in top_dir.iterdir():
         if file.is_file():
             name = file.name
@@ -106,16 +106,16 @@ def create_function_list(num_files) -> list:
         for _ in range(num_files)
     ]
 
-def create_function_declaration(function_name, function_signature):
+def create_function_declaration(function_name, function_signature) -> str:
     # Signature is of the form [return_type, num_args, arg_type1, arg_type2, ...]
     return_type = function_signature[0]
     arg_types = function_signature[2:]
 
     args_str = ", ".join(f"{arg_type} arg{i}" for i, arg_type in enumerate(arg_types))
 
-    return f"{return_type} {function_name}({args_str})"
+    return f"{return_type:4}\t{function_name}({args_str})"
 
-def create_function_call(function_name, function_signature):
+def create_function_call(function_name, function_signature)-> str:
     return_type = function_signature[0]
     arg_types = function_signature[2:]
     args = []
@@ -136,30 +136,30 @@ def create_function_call(function_name, function_signature):
 
     return f"{return_type} {function_name}_val = {function_name}({args_str});"
 
-
-def generate_utility_file(identity: int, avg_num_functions: int, name_length: int, print: bool = False):
-    global utility_list
-    filename = 'libutility' + str(identity)
+def generate_function_names(base_name: str, avg_num_functions: int, name_length: int) -> list:
     num_functions = random.randint(avg_num_functions // 2, (avg_num_functions * 3) // 2)
     functions = create_function_list(num_functions)
-    # utility_list.append(functions)
     function_names = []
     for index, function in enumerate(functions):
         random_digits = ''.join(random.choices('0123456789', k=name_length))
-        function_names.append(filename + '_fun' + str(index) + random_digits)
-    utility_list.append(zip(function_names, functions))
+        function_names.append(base_name + '_fun' + str(index) + random_digits)
+    return [(a, b) for a, b in zip(function_names, functions)]
+
+def generate_utility_file(identity: int, avg_num_functions: int, name_length: int, print: bool = False):
+    filename = 'libutility' + str(identity)
+    utility_list = generate_function_names(filename, avg_num_functions, name_length)
 
     # Generate the Header file and Function declarations
-    with open(filename + '.h', 'w') as h_file:
+    with open("gen_src/" + filename + '.h', 'w') as h_file:
         h_file.write('#include <stdio.h>\n#include <stdlib.h>\n\n')
-        for index, function in enumerate(functions):
-            h_file.write(create_function_declaration(function_names[index], function) + ';\n')
+        for func_name, signature in utility_list:
+            h_file.write(create_function_declaration(func_name, signature) + ';\n')
 
-    with open(filename + '.c', 'w') as c_file:
+    with open("gen_src/" + filename + '.c', 'w') as c_file:
         c_file.write('#include "' + filename + '.h"\n\n')
-        for index, function in enumerate(functions):
-            c_file.write(create_function_declaration(function_names[index], functions[0]) + ' {\n')
-            c_file.write('\t' + function[0] + ' ret_val;\n')
+        for index, (func_name, signature) in enumerate(utility_list):
+            c_file.write(create_function_declaration(func_name, signature) + ' {\n')
+            c_file.write('\t' + signature[0] + ' ret_val;\n')
             c_file.write(
                 "\tint a, b, c, loop;\n"
                 "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
@@ -168,7 +168,7 @@ def generate_utility_file(identity: int, avg_num_functions: int, name_length: in
             )
 
             if print:
-                c_file.write('\tprintf("In module ' + filename + ' function ' + function_names[index] + '\\n");\n')
+                c_file.write('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
             c_file.write(
                 "\tfor (loop = 0; loop < 10; loop++)\n"
                 "\t{\n"
@@ -176,44 +176,41 @@ def generate_utility_file(identity: int, avg_num_functions: int, name_length: in
                 "\t}\n"
             )
 
-            if function != functions[-1]:
-                f_call = create_function_call(function_names[index + 1], functions[index + 1])
+            if index != len(utility_list) - 1:
+                f_call = create_function_call(utility_list[index + 1][0], utility_list[index + 1][1])
                 c_file.write('\t' + f_call + ';\n')
             c_file.write('\treturn ret_val;\n}\n\n')
+    return utility_list
 
-def generate_module_file(util_enabled: bool, extern: bool, identity: int, avg_num_functions: int, name_length: int, print: bool = False):
-    global extern_list
-    global utility_list
+def generate_module_file(extern_list: list, utility_list: list, identity: int, avg_num_functions: int, name_length: int, print: bool = False, call_depth: int = 10):
     filename = 'libmodule' + str(identity)
-    num_functions = random.randint(avg_num_functions // 2, (avg_num_functions * 3) // 2)
-    functions = create_function_list(num_functions)
-    function_names = []
-    for index, function in enumerate(functions):
-        random_digits = ''.join(random.choices('0123456789', k=name_length))
-        function_names.append(filename + '_fun' + str(index) + random_digits)
+    module_functions_list = generate_function_names(filename, avg_num_functions, name_length)
 
-    with open(filename + '.c', 'w') as c_file:
+    with open("gen_src/" + filename + '.c', 'w') as c_file:
         c_file.write('#include <Python.h>\n')
-        if util_enabled:
+        if utility_list:
             c_file.write('#include "pynamic.h"\n')
-        if extern:
+        c_file.write("\n")
+        if extern_list:
             if identity != 0:
                 c_file.write('extern ')
                 decl = create_function_declaration( f"libmodule{identity -1}_extern", extern_list[identity - 1] )
                 c_file.write(decl + ";\n")
             c_file.write(create_function_declaration(filename + "_extern", extern_list[identity]))
-            c_file.write(f"\n{{\n\t {extern_list[identity][0]} ret_val;")
+            c_file.write(f"\n{{\n\t{extern_list[identity][0]} ret_val;")
             if print:
                 c_file.write(f"\tprintf('I am {filename}_extern called from another module\\n');\n")
             c_file.write('\treturn ret_val;\n}\n\n')
 
-        for index, function in enumerate(functions):
-            c_file.write(create_function_declaration(function_names[index], function) + ";\n")
-            c_file.write("\n")
+        # Create Function Declarations
+        for func_name, signature in module_functions_list:
+            c_file.write(create_function_declaration(func_name, signature) + ";\n")
+        c_file.write("\n")
 
-        for index, function in enumerate(functions):
-            c_file.write(create_function_declaration(function_names[index], function) + "{\n")
-            c_file.write('\t' + function[0] + ' ret_val;\n')
+        # Create Function Definitions
+        for index, (func_name, signature) in enumerate(module_functions_list):
+            c_file.write(create_function_declaration(func_name, signature) + "{\n")
+            c_file.write('\t' + signature[0] + ' ret_val;\n')
             c_file.write(
                 "\tint a, b, c, loop;\n"
                 "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
@@ -221,39 +218,85 @@ def generate_module_file(util_enabled: bool, extern: bool, identity: int, avg_nu
                 "\tchar j[10], k[100], l[10][10];\n\n"
             )
             if print:
-                c_file.write('\tprintf("In module ' + filename + ' function ' + function_names[index] + '\\n");\n')
+                c_file.write('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
             c_file.write(
                 "\tfor (loop = 0; loop < 10; loop++)\n"
                 "\t{\n"
                 "\t\ta = loop;\n"
             )
 
-            if util_enabled:
+            if utility_list:
                 utility_file = random.choice(utility_list)
-                # utility_call = create_function_call( , )
+                func_name, signature = random.choice(utility_file)
+                utility_call = create_function_call( func_name, signature )
+                c_file.write("\t\t" + utility_call)
+            c_file.write("\n\t}\n")
 
+            if index != len(module_functions_list) - 1:
+                f_call = create_function_call(module_functions_list[index + 1][0], module_functions_list[index + 1][1])
+                c_file.write(f"\t{f_call}\n")
+            c_file.write('\treturn ret_val;\n}\n\n')
 
+        # Create PyObject Entry
+        entry_func_name = filename + "_entry"
+        c_file.write(f"static PyObject *py_{entry_func_name}(PyObject *self, PyObject *args){{\n")
+        c_file.write("\tint ret_val = 0;\n")
 
+        for index, (func_name, signature) in enumerate(module_functions_list):
+            if index % call_depth == 0:
+                func_call = create_function_call( func_name, signature )
+                c_file.write(f"\t{func_call}\n")
 
+        if identity != 0 and extern_list:
+            func_call = create_function_call( f"libmodule{identity - 1}_extern", extern_list[identity - 1] )
+            c_file.write(f"\t{func_call}\n")
+        c_file.write("\treturn Py_BuildValue(\"i\", ret_val);\n}\n\n")
+
+        # Initialize Python CModule
+        c_file.write(f"static PyMethodDef {filename}Methods[] = {{\n")
+        c_file.write(f"\t{{\"{entry_func_name}\", py_{entry_func_name}, METH_VARARGS, \"a function.\"}},\n")
+        c_file.write("\t{NULL, NULL, 0, NULL}\n};\n\n")
+
+        c_file.write(f"PyMODINIT_FUNC PyInit_{filename}(){{\n")
+        c_file.write(
+            "\tstatic struct PyModuleDef mod = {\n"
+            "\t\tPyModuleDef_HEAD_INIT,\n"
+        )
+        c_file.write(f"\t\t\"{filename}\",\n")
+        c_file.write("\t\t\"\",\n\t\t-1,\n")
+        c_file.write(f"\t\t{filename}Methods\n\t}};\n")
+        c_file.write("\treturn PyModule_Create(&mod);\n}\n\n")
 
 def generate_shared_objects(parser):
+    utility_list = []
+    extern_list = []
+    module_file_count = max(1, parser.num_files - parser.num_utility_mods)
     if parser.seed:
-        random.seed(parser.s)
+        random.seed(parser.seed)
     if parser.external:
-        global extern_list
         extern_list = create_function_list(parser.num_files)
 
-    # pool = mp.Pool(processes=parser.j)
-    with open('pynamic.h', 'w') as py_header:
+    for index in range(parser.num_utility_mods):
+        utility_functions = generate_utility_file(index, parser.avg_num_u_functions, parser.name_length, parser.print)
+        utility_list.append(utility_functions)
+    for index in range(module_file_count):
+        generate_module_file(extern_list, utility_list, index, parser.avg_num_functions, parser.name_length, parser.print, parser.depth)
+
+
+    with open('gen_src/pynamic.h', 'w') as py_header:
         py_header.write('#include <math.h>\n')
-        if parser.num_utility_mods:
-            # global utility_list
-            # utility_list = []
-            for index in range(parser.num_utility_mods):
-                py_header.write(f'#include "libutility{index}.h"\n')
-                generate_utility_file(index, parser.avg_num_u_functions, parser.name_length, parser.print)
-        for index in range(max(1, parser.num_files - parser.num_utility_mods)):
-            generate_module_file(parser.num_utility_mods > 0, parser.external, index, parser.avg_num_functions, parser.name_length, parser.print)
+        for index in range(parser.num_utility_mods):
+            py_header.write(f'#include "libutility{index}.h"\n')
+        py_header.write("void initlibmodulebegin();\n")
+        for index in range(module_file_count):
+            py_header.write(f"void initlibmodule{index}();\n")
+        py_header.write("void initlibmodulefinal();\n")
+
+    # TODO: Compile util
+    # TODO: Compile libmodulefinal.c libmodulebegin.c
+    # TODO: Compile modules
+    # TODO: Archive modules and utilities into libpynamic.a with scru
+
 
 def configure(parser):
     if parser.big_exe:
