@@ -282,7 +282,6 @@ def generate_shared_objects(parser):
     for index in range(module_file_count):
         generate_module_file(extern_list, utility_list, index, parser.avg_num_functions, parser.name_length, parser.print, parser.depth)
 
-
     with open('gen_src/pynamic.h', 'w') as py_header:
         py_header.write('#include <math.h>\n')
         for index in range(parser.num_utility_mods):
@@ -295,7 +294,10 @@ def generate_shared_objects(parser):
     # TODO: Compile util
     # TODO: Compile libmodulefinal.c libmodulebegin.c
     # TODO: Compile modules
-    # TODO: Archive modules and utilities into libpynamic.a with scru
+    # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
+    # TODO: Edit the pynamic_sdb file #so_generator.py:423
+    # TODO: Create mpi4py driver file
+    return
 
 
 def configure(parser):
@@ -311,6 +313,10 @@ def configure(parser):
     # configure_args, python_command, bigexe, use_mpi4py, processes = parse_and_run('config_pynamic.py')
     clean_pynamic_files()
     generate_shared_objects(parser)
+
+    os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
+    os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
+    os.environ["PYTHON_EXE"] = str(parser.with_python)
 
     pass
     # command = 'make -f Makefile.mpi4py clean'
