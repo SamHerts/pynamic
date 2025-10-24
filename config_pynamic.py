@@ -139,12 +139,14 @@ def create_function_call(function_name, function_signature)-> str:
 
 def generate_function_names(base_name: str, avg_num_functions: int, name_length: int) -> list:
     num_functions = random.randint(avg_num_functions // 2, (avg_num_functions * 3) // 2)
-    functions = create_function_list(num_functions)
-    function_names = []
-    for index, function in enumerate(functions):
-        random_digits = ''.join(random.choices('0123456789', k=name_length))
-        function_names.append(base_name + '_fun' + str(index) + random_digits)
-    return [(a, b) for a, b in zip(function_names, functions)]
+    signatures = create_function_list(num_functions)
+    digits = "0123456789"
+    output = []
+    for idx, signature in enumerate(signatures):
+        suffix = ''.join(random.choices(digits, k=name_length)) if name_length else ''
+        output.append((f"{base_name}_fun{idx}{suffix}", signature))
+
+    return output
 
 def generate_utility_file(identity: int, avg_num_functions: int, name_length: int, print: bool = False):
     filename = 'libutility' + str(identity)
@@ -268,19 +270,61 @@ def generate_module_file(extern_list: list, utility_list: list, identity: int, a
         c_file.write(f"\t\t{filename}Methods\n\t}};\n")
         c_file.write("\treturn PyModule_Create(&mod);\n}\n\n")
 
+def generate_driver_file(num_files):
+    with open("pynamic_driver_mpi4py.py", "r") as f:
+        lines = f.readlines()
+
+    updated_lines = []
+    in_import_block = False
+    in_call_block = False
+
+    for line in lines:
+        if line.strip() == '## START_MODULE_IMPORTS':
+            updated_lines.append(line)
+            in_import_block = True
+
+            for i in range(num_files):
+                updated_lines.append(f'import libmodule{i}\n')
+            continue  # Skip adding the original line, as we've replaced the block
+
+        if line.strip() == '## END_MODULE_IMPORTS':
+            in_import_block = False
+            updated_lines.append(line)  # Add the end marker
+            continue
+
+        if line.strip() == '## START_MODULE_CALLS':
+            updated_lines.append(line)
+            in_call_block = True
+            # Insert new call lines
+            for i in range(num_files):
+                updated_lines.append(f'libmodule{i}.libmodule{i}_entry()\n')
+            continue  # Skip adding the original line, as we've replaced the block
+
+        if line.strip() == '## END_MODULE_CALLS':
+            in_call_block = False
+            updated_lines.append(line)  # Add the end marker
+            continue
+
+        # If we are inside a marked block, skip the original lines
+        if in_import_block or in_call_block:
+            continue
+
+        updated_lines.append(line)
+
+        with open("gen_src/pynamic_driver_mpi4py.py", "w") as f:
+            f.writelines(updated_lines)
+
 def configure_and_build_libraries():
-    command = ['cmake -S gen_src -B build']
-    try:
-        subprocess.run(command)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        sys.exit(1)
+    def run_command(command):
+        try:
+            subprocess.run(command, shell=True, check=True)
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"{command} | {e}")
+            sys.exit(1)
 
-    command = ['cmake --build build']
-    try:
-        subprocess.run(command)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        sys.exit(1)
-
+    run_command('rm -rf build')
+    run_command('cmake -S gen_src -B build')
+    run_command('cmake --build build')
 
 def generate_shared_objects(parser):
     utility_list = []
@@ -306,16 +350,12 @@ def generate_shared_objects(parser):
             py_header.write(f"void initlibmodule{index}();\n")
         py_header.write("void initlibmodulefinal();\n")
 
-
-    # TODO: Compile util
-    # TODO: Compile libmodulefinal.c libmodulebegin.c
-    # TODO: Compile modules
-    # configure_and_build_libraries()
+    configure_and_build_libraries()
     # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
     # TODO: Edit the pynamic_sdb file #so_generator.py:423
-    # TODO: Create mpi4py driver file
-    return
-
+    print('Generating driver...')
+    generate_driver_file(module_file_count)
+    print('Done!\n')
 
 def configure(parser):
     if parser.big_exe:
@@ -331,9 +371,9 @@ def configure(parser):
     clean_pynamic_files()
     generate_shared_objects(parser)
 
-    os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
-    os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
-    os.environ["PYTHON_EXE"] = str(parser.with_python)
+    # os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
+    # os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
+    # os.environ["PYTHON_EXE"] = str(parser.with_python)
 
     # TODO: Run make clean on Makefile.mpi4py
     # command = 'make -f Makefile.mpi4py clean'
@@ -345,39 +385,39 @@ def configure(parser):
     # TODO: Run make on Makefile.mpi4py with targets as pynamic and big_exe
     # command = 'make -j ' + str(processes) + ' -f Makefile.mpi4py ' + target
     # run_command(command)
-    return
-    if bigexe == False:
-        command = 'rm -f pynamic-bigexe-pyMPI pynamic-bigexe-sdb-pyMPI pynamic-bigexe-mpi4py'
-        run_command(command, False)
+    # TODO: Move addall and get-symtab-sizes to this python file
+    # if bigexe == False:
+    #     command = 'rm -f pynamic-bigexe-pyMPI pynamic-bigexe-sdb-pyMPI pynamic-bigexe-mpi4py'
+    #     run_command(command, False)
 
     #
     # build the addall utility program
     #
-    if os.path.exists('pynamic-pyMPI-2.6a1/addall.c') != True:
-        print_error('required file addall.c not found!')
-        sys.exit(0)
-
-    command = "gcc -g addall.c -o addall"
-    run_command(command)
-
+    # if os.path.exists('pynamic-pyMPI-2.6a1/addall.c') != True:
+    #     print_error('required file addall.c not found!')
+    #     sys.exit(0)
     #
-    # check DBG, text, symbol table, and string table size.
+    # command = "gcc -g addall.c -o addall"
+    # run_command(command)
     #
-    if os.path.exists('pynamic-pyMPI-2.6a1/get-symtab-sizes') != True:
-        print_error('required file get-symtab-sizes not found!')
-        sys.exit(0)
-
-    for exe in ['pynamic-pyMPI', 'pynamic-sdb-pyMPI', 'pynamic-bigexe-pyMPI', 'pynamic-bigexe-sdb-pyMPI', 'pynamic-mpi4py', 'pynamic-bigexe-mpi4py']:
-        info_file = 'sharedlib_section_info_%s' %(exe)
-        os.system('rm -f %s' %(info_file))
-        if os.path.exists(exe):
-            command = "./get-symtab-sizes %s > %s" %(exe, info_file)
-            ret = run_command(command)
-            if ret != 0:
-                print_error('Failed to get executable statistics for %s!' %(exe))
-            else:
-                command = "tail -10 %s" %(info_file)
-                run_command(command)
+    # #
+    # # check DBG, text, symbol table, and string table size.
+    # #
+    # if os.path.exists('pynamic-pyMPI-2.6a1/get-symtab-sizes') != True:
+    #     print_error('required file get-symtab-sizes not found!')
+    #     sys.exit(0)
+    #
+    # for exe in ['pynamic-pyMPI', 'pynamic-sdb-pyMPI', 'pynamic-bigexe-pyMPI', 'pynamic-bigexe-sdb-pyMPI', 'pynamic-mpi4py', 'pynamic-bigexe-mpi4py']:
+    #     info_file = 'sharedlib_section_info_%s' %(exe)
+    #     os.system('rm -f %s' %(info_file))
+    #     if os.path.exists(exe):
+    #         command = "./get-symtab-sizes %s > %s" %(exe, info_file)
+    #         ret = run_command(command)
+    #         if ret != 0:
+    #             print_error('Failed to get executable statistics for %s!' %(exe))
+    #         else:
+    #             command = "tail -10 %s" %(info_file)
+    #             run_command(command)
 
 if __name__ == '__main__':
     configure(parse_args())
