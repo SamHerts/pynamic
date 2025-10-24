@@ -42,3 +42,8 @@ target_include_directories(modules PRIVATE ${Python_INCLUDE_DIRS})
 target_link_libraries(modules PRIVATE ${Python_LIBRARIES})
 
 add_library(pynamic STATIC ${UTILITY_SOURCES} ${MODULE_SOURCES} ${MODULE_STATIC_SOURCES})
+
+set(MAIN_SOURCES "mpi4py_main.c")
+
+add_executable(pynamic-mpi4py ${MAIN_SOURCES})
+target_link_libraries(pynamic-mpi4py pynamic)
