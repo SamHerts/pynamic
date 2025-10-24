@@ -1,8 +1,14 @@
 import random
+
+import pytest
+
 from config_pynamic import *
 
-def test_function_list_with_seed():
+@pytest.fixture(autouse=True)
+def set_random_seed():
     random.seed(42)
+
+def test_function_list():
     result = create_function_list(3)
     expected = [
         ['int', 0],
@@ -11,15 +17,27 @@ def test_function_list_with_seed():
     ]
     assert result == expected
 
+def test_function_name_creation():
+    base_name = "my_base_name"
+    avg_num_functions = 10
+    name_length = 0
+    gen_functions = generate_function_names(base_name, avg_num_functions, name_length)
+    assert len(gen_functions) == 15
+    assert gen_functions[0] == ("my_base_name_fun0", ['int', 0])
+
+    name_length = 5
+    gen_functions = generate_function_names(base_name, avg_num_functions, name_length)
+
+    assert len(gen_functions) == 5
+    assert gen_functions[4] == ("my_base_name_fun445391", ['long', 3, 'double', 'float', 'char *'])
+
 def test_create_function_declaration():
-    assert create_function_declaration("foo", ["void", 0]) == "void foo()"
-    assert create_function_declaration("bar", ["int", 1, "float"]) == "int bar(float arg0)"
-    assert create_function_declaration("baz", ["double", 3, "int", "float", "char"]) == "double baz(int arg0, float arg1, char arg2)"
-    assert create_function_declaration("qux", ["int", 2, "int", "float", "char"]) == "int qux(int arg0, float arg1, char arg2)"
+    assert create_function_declaration("foo", ["void", 0]) == "void\tfoo()"
+    assert create_function_declaration("bar", ["int", 1, "float"]) == "int \tbar(float arg0)"
+    assert create_function_declaration("baz", ["double", 3, "int", "float", "char"]) == "double\tbaz(int arg0, float arg1, char arg2)"
+    assert create_function_declaration("qux", ["int", 2, "int", "float", "char"]) == "int \tqux(int arg0, float arg1, char arg2)"
 
-def test_create_function_call_with_seed():
-    random.seed(42)
-
+def test_create_function_call():
     function_name = "libutility0_fun"
     function_signature = ["float", 4, "int", "char *", "double", "long"]
 
@@ -30,7 +48,7 @@ def test_create_function_call_with_seed():
     assert result == expected
 
 
-def test_generate_utility_file_with_seed(mocker):
+def test_generate_utility_file(mocker):
     # Set up mocks
     mock_create_list = mocker.patch("config_pynamic.create_function_list")
     mock_create_decl = mocker.patch("config_pynamic.create_function_declaration")
@@ -55,7 +73,8 @@ def test_generate_utility_file_with_seed(mocker):
     # Check file writes
     handle = mock_open()
     written = "".join(call.args[0] for call in handle.write.call_args_list)
-    print(written)
+    # print("\n\n" + written)
+
 
     assert "#include <stdio.h>" in written
     assert "int libutility1_fun0" in written
