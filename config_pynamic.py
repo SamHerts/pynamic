@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-s", "--seed", type=int,
                         help="Seed to the random number generator")
 
-    parser.add_argument("-u", nargs=2, type=int, metavar=('num_utility_mods', 'avg_num_u_functions'),
+    parser.add_argument("-u", nargs=2, type=int, default=(0,0), metavar=('num_utility_mods', 'avg_num_u_functions'),
                         help="Create utility modules with an average number of functions")
 
     parser.add_argument("--with-cc", metavar="[command]",
