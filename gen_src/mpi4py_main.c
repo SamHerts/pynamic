@@ -1,6 +1,6 @@
+#include <Python.h>
 #include <stdlib.h>
 #include <mpi.h>
-#include <Python.h>
 
 #if !defined(STR)
 #define XSTR(X) #X
