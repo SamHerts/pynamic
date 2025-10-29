@@ -19,7 +19,6 @@ else()
         message(FATAL_ERROR "MPI library not found. Please ensure MPI is installed.")
 endif()
 
-# Define a variable to hold the list of source files
 set(UTILITY_SOURCES "")
 set(MODULE_SOURCES "")
 
@@ -32,20 +31,21 @@ if(NOT MODULE_SOURCES)
     message(FATAL_ERROR "No libmodule*.c files found in ${CMAKE_CURRENT_SOURCE_DIR}")
 endif()
 
-# Get the count of detected files (optional, for informational purposes)
+# Get the count of detected files
 list(LENGTH UTILITY_SOURCES NUM_U_FILES)
 list(LENGTH MODULE_SOURCES NUM_M_FILES)
 message(STATUS "Detected ${NUM_U_FILES} module files.")
 message(STATUS "Detected ${NUM_M_FILES} utility files.")
 
-# --- THE KEY CHANGE IS HERE: Use SHARED instead of STATIC ---
-# Add the shared library target
+set(UTILITY_TARGETS "")
+
 if (NUM_U_FILES GREATER 0)
     foreach(UTILITY_FILE ${UTILITY_SOURCES})
         get_filename_component(UTILITY_NAME ${UTILITY_FILE} NAME_WE)
         add_library(${UTILITY_NAME} SHARED ${UTILITY_FILE})
         target_include_directories(${UTILITY_NAME} PRIVATE ${Python_INCLUDE_DIRS})
         target_link_libraries(${UTILITY_NAME} PRIVATE Python::Python)
+        list(APPEND UTILITY_TARGETS ${UTILITY_NAME})
     endforeach()
 endif()
 
@@ -69,7 +69,7 @@ foreach(MODULE_FILE ${MODULE_SOURCES})
     endif()
 
     target_include_directories(${MODULE_NAME} PRIVATE ${Python_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE Python::Python)
+    target_link_libraries(${MODULE_NAME} PRIVATE Python::Python ${UTILITY_TARGETS})
 endforeach()
 
 
@@ -81,7 +81,18 @@ add_executable(pynamic-mpi4py ${MAIN_SOURCES})
 target_compile_definitions(pynamic-mpi4py PRIVATE ROOT_DIR=${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(pynamic-mpi4py pynamic MPI::MPI_C Python::Python)
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
-               ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
-               COPYONLY)
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
+            ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
+    COMMENT "Copying pynamic_driver_mpi4py.py to build directory"
+)
+
+add_custom_target(copy_driver ALL
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
+)
+
+add_dependencies(pynamic-mpi4py copy_driver)
 
