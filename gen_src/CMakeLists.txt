@@ -5,11 +5,18 @@ find_package(Python 3 COMPONENTS Interpreter Development)
 if(Python_FOUND)
     message(STATUS "Found Python3: ${Python_EXECUTABLE}")
     message(STATUS "Python3 include directories: ${Python_INCLUDE_DIRS}")
-    # Add Python's include directories to your project
     include_directories(${Python_INCLUDE_DIRS})
-    # If you're linking against the Python library later, you'd also use ${Python3_LIBRARIES}
 else()
     message(FATAL_ERROR "Python 3 development libraries not found. Please ensure Python 3 is installed with development headers.")
+endif()
+
+find_package(MPI COMPONENTS C)
+if(MPI_FOUND)
+    message(STATUS "Found MPI - ${MPI_VERSION}")
+    message(STATUS "MPI include directores: ${MPI_C_INCLUDE_DIRS}")
+    include_directories(${MPI_C_INCLUDE_DIRS})
+else()
+        message(FATAL_ERROR "MPI library not found. Please ensure MPI is installed.")
 endif()
 
 # Define a variable to hold the list of source files
@@ -34,16 +41,47 @@ message(STATUS "Detected ${NUM_M_FILES} utility files.")
 # --- THE KEY CHANGE IS HERE: Use SHARED instead of STATIC ---
 # Add the shared library target
 if (NUM_U_FILES GREATER 0)
-    add_library(utility SHARED ${UTILITY_SOURCES})
+    foreach(UTILITY_FILE ${UTILITY_SOURCES})
+        get_filename_component(UTILITY_NAME ${UTILITY_FILE} NAME_WE)
+        add_library(${UTILITY_NAME} SHARED ${UTILITY_FILE})
+        target_include_directories(${UTILITY_NAME} PRIVATE ${Python_INCLUDE_DIRS})
+        target_link_libraries(${UTILITY_NAME} PRIVATE Python::Python)
+    endforeach()
 endif()
 
-add_library(modules SHARED ${MODULE_SOURCES})
-target_include_directories(modules PRIVATE ${Python_INCLUDE_DIRS})
-target_link_libraries(modules PRIVATE ${Python_LIBRARIES})
+foreach(MODULE_FILE ${MODULE_SOURCES})
+    get_filename_component(MODULE_NAME ${MODULE_FILE} NAME_WE)
+
+    # Create a Python extension module (shared library with special properties)
+    add_library(${MODULE_NAME} MODULE ${MODULE_FILE})
+
+    # Set the output name to match Python's expectations
+    set_target_properties(${MODULE_NAME} PROPERTIES
+        PREFIX ""  # No 'lib' prefix
+        SUFFIX "${Python_SOABI}.so"  # Use Python's suffix
+    )
+
+    # On macOS, use .so extension instead of .dylib for Python modules
+    if(APPLE)
+        set_target_properties(${MODULE_NAME} PROPERTIES
+            SUFFIX ".so"
+        )
+    endif()
+
+    target_include_directories(${MODULE_NAME} PRIVATE ${Python_INCLUDE_DIRS})
+    target_link_libraries(${MODULE_NAME} PRIVATE Python::Python)
+endforeach()
+
 
 add_library(pynamic STATIC ${UTILITY_SOURCES} ${MODULE_SOURCES} ${MODULE_STATIC_SOURCES})
 
 set(MAIN_SOURCES "mpi4py_main.c")
 
 add_executable(pynamic-mpi4py ${MAIN_SOURCES})
-target_link_libraries(pynamic-mpi4py pynamic)
+target_compile_definitions(pynamic-mpi4py PRIVATE ROOT_DIR=${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(pynamic-mpi4py pynamic MPI::MPI_C Python::Python)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
+               ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
+               COPYONLY)
+
