@@ -324,7 +324,7 @@ def configure_and_build_libraries():
 
     run_command('rm -rf build')
     run_command('cmake -S gen_src -B build')
-    run_command('cmake --build build')
+    run_command('cmake --build build --parallel')
 
 def generate_shared_objects(parser):
     utility_list = []
