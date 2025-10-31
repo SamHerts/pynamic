@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(PynamicSharedLibrary C)
 
+set(CMAKE_SHARED_MODULE_SUFFIX ".so")
+set(CMAKE_SHARED_MODULE_PREFIX "")
+
 find_package(Python 3 COMPONENTS Interpreter Development)
 if(Python_FOUND)
     message(STATUS "Found Python3: ${Python_EXECUTABLE}")
@@ -49,29 +52,17 @@ if (NUM_U_FILES GREATER 0)
     endforeach()
 endif()
 
+add_library(pynamic_interface INTERFACE)
+target_link_libraries(pynamic_interface INTERFACE Python::Python MPI::MPI_C)
+target_include_directories(pynamic_interface INTERFACE ${Python_INCLUDE_DIRS} ${MPI_C_INCLUDE_DIRS})
+
 foreach(MODULE_FILE ${MODULE_SOURCES})
     get_filename_component(MODULE_NAME ${MODULE_FILE} NAME_WE)
 
-    # Create a Python extension module (shared library with special properties)
+    # Create a Python extension module
     add_library(${MODULE_NAME} MODULE ${MODULE_FILE})
-
-    # Set the output name to match Python's expectations
-    set_target_properties(${MODULE_NAME} PROPERTIES
-        PREFIX ""  # No 'lib' prefix
-        SUFFIX "${Python_SOABI}.so"  # Use Python's suffix
-    )
-
-    # On macOS, use .so extension instead of .dylib for Python modules
-    if(APPLE)
-        set_target_properties(${MODULE_NAME} PROPERTIES
-            SUFFIX ".so"
-        )
-    endif()
-
-    target_include_directories(${MODULE_NAME} PRIVATE ${Python_INCLUDE_DIRS})
-    target_link_libraries(${MODULE_NAME} PRIVATE Python::Python ${UTILITY_TARGETS})
+    target_link_libraries(${MODULE_NAME} PRIVATE pynamic_interface ${UTILITY_TARGETS})
 endforeach()
-
 
 add_library(pynamic STATIC ${UTILITY_SOURCES} ${MODULE_SOURCES} ${MODULE_STATIC_SOURCES})
 
