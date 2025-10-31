@@ -4,7 +4,7 @@ project(PynamicSharedLibrary C)
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 set(CMAKE_SHARED_MODULE_PREFIX "")
 
-find_package(Python 3 COMPONENTS Interpreter Development)
+find_package(Python 3.9 EXACT COMPONENTS Interpreter Development)
 if(Python_FOUND)
     message(STATUS "Found Python3: ${Python_EXECUTABLE}")
     message(STATUS "Python3 include directories: ${Python_INCLUDE_DIRS}")
@@ -72,18 +72,9 @@ add_executable(pynamic-mpi4py ${MAIN_SOURCES})
 target_compile_definitions(pynamic-mpi4py PRIVATE ROOT_DIR=${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(pynamic-mpi4py pynamic MPI::MPI_C Python::Python)
 
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+add_custom_command( TARGET pynamic-mpi4py POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
             ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
     COMMENT "Copying pynamic_driver_mpi4py.py to build directory"
 )
-
-add_custom_target(copy_driver ALL
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
-)
-
-add_dependencies(pynamic-mpi4py copy_driver)
-
