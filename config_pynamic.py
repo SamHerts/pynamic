@@ -326,36 +326,35 @@ def configure_and_build_libraries():
     run_command('cmake -S gen_src -B build')
     run_command('cmake --build build --parallel')
 
-def generate_shared_objects(parser):
+def generate_shared_objects(parser, num_modules):
     utility_list = []
     extern_list = []
-    module_file_count = max(1, parser.num_files - parser.num_utility_mods)
+
     if parser.seed:
         random.seed(parser.seed)
     if parser.external:
         extern_list = create_function_list(parser.num_files)
 
+    if parser.num_utility_mods:
+        print("Generating Utility Libraries")
     for index in range(parser.num_utility_mods):
         utility_functions = generate_utility_file(index, parser.avg_num_u_functions, parser.name_length, parser.print)
         utility_list.append(utility_functions)
-    for index in range(module_file_count):
+    print("Generating Modules")
+    for index in range(num_modules):
         generate_module_file(extern_list, utility_list, index, parser.avg_num_functions, parser.name_length, parser.print, parser.depth)
 
+    print("Generating Library Header")
     with open('gen_src/pynamic.h', 'w') as py_header:
         py_header.write('#include <math.h>\n')
         for index in range(parser.num_utility_mods):
             py_header.write(f'#include "libutility{index}.h"\n')
         py_header.write("void initlibmodulebegin();\n")
-        for index in range(module_file_count):
+        for index in range(num_modules):
             py_header.write(f"void initlibmodule{index}();\n")
         py_header.write("void initlibmodulefinal();\n")
 
-    configure_and_build_libraries()
-    # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
-    # TODO: Edit the pynamic_sdb file #so_generator.py:423
-    print('Generating driver...')
-    generate_driver_file(module_file_count)
-    print('Done!\n')
+
 
 def configure(parser):
     if parser.big_exe:
@@ -367,9 +366,20 @@ def configure(parser):
     if parser.u:
         parser.num_utility_mods, parser.avg_num_u_functions = parser.u
 
-    # configure_args, python_command, bigexe, use_mpi4py, processes = parse_and_run('config_pynamic.py')
+    module_file_count = max(1, parser.num_files - parser.num_utility_mods)
+
+    print("Cleaning old files...")
     clean_pynamic_files()
-    generate_shared_objects(parser)
+    generate_shared_objects(parser, module_file_count)
+
+
+    # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
+    # TODO: Edit the pynamic_sdb file #so_generator.py:423
+    print('Generating driver...')
+    generate_driver_file(module_file_count)
+    print('Building libraries...')
+    configure_and_build_libraries()
+    print('Done!\n')
 
     # os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
     # os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
