@@ -99,7 +99,6 @@ into an existing python3 environment.
 
 #### To BUILD
 ```
-    % cd pynamic-pyMPI-2.6a1
     % config_pynamic.py
 
       USAGE:
