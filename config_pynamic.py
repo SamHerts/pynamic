@@ -8,16 +8,22 @@ import random
 import multiprocessing as mp
 import subprocess
 
+class PositiveInt(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values < 0:
+            parser.error(f"{option_string or values} must be a positive integer.")
+        setattr(namespace, self.dest, int(values))
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate Pynamic shared libraries and configure/build', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("num_files", type=int, help="Total number of shared objects to produce")
-    parser.add_argument("avg_num_functions", type=int, help="Average number of functions per shared object")
+    parser.add_argument("num_files", type=int, action=PositiveInt, help="Total number of shared objects to produce")
+    parser.add_argument("avg_num_functions", type=int, action=PositiveInt, help="Average number of functions per shared object")
 
     parser.add_argument("-b", "--big-exe", action="store_true",
                         help="Generate the pynamic-bigexe-pyMPI and pynamic-bigexe-sdb-pyMPI executables")
 
-    parser.add_argument("-d","--depth", type=int, default=10,
+    parser.add_argument("-d","--depth", type=int, default=10, action=PositiveInt,
                         help="Maximum Pynamic call stack depth")
 
     parser.add_argument("-e","--external", action="store_true",
@@ -26,10 +32,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-i", metavar="python_include_dir",
                         help="Add <python_include_dir> when compiling modules")
 
-    parser.add_argument("-j", metavar="[N]", type=int,
+    parser.add_argument("-j", metavar="[N]", type=int, action=PositiveInt,
                         help="Build in parallel with a max of <N> processes")
 
-    parser.add_argument("-n", dest="name_length", default=0, metavar="[N]", type=int,
+    parser.add_argument("-n", dest="name_length", default=0, metavar="[N]", type=int, action=PositiveInt,
                         help="Add <N> characters to the function names")
 
     parser.add_argument("-p", "--print", action="store_true",
@@ -40,6 +46,8 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("-u", nargs=2, type=int, default=(0,0), metavar=('num_utility_mods', 'avg_num_u_functions'),
                         help="Create utility modules with an average number of functions")
+
+    parser.add_argument("-G", "--generator", type=str, default="Ninja", help="Compile C Modules with <G> generator.")
 
     parser.add_argument("--with-cc", metavar="[command]",
                         help="Use the C compiler located at <command> to build Pynamic modules")
@@ -300,17 +308,36 @@ def generate_driver_file(num_files):
 
         with open("gen_src/pynamic_driver_mpi4py.py", "w") as f:
             f.writelines(updated_lines)
+
 def run_command(command):
     try:
-        subprocess.run(command, shell=True, check=True)
+        subprocess.run(command, shell=False, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError) as e:
         print(f"{command} | {e}")
         sys.exit(1)
 
-def configure_and_build_libraries():
-    run_command('rm -rf build')
-    run_command('cmake -S gen_src -B build')
-    run_command('cmake --build build --parallel')
+def configure_and_build_libraries(generator="Ninja", source_dir="gen_src", build_dir="build", jobs: int = 1):
+    clean_command = [
+        'rm',
+        '-rf',
+        str(build_dir),
+    ]
+
+    cfg_command = [
+        'cmake',
+        f'-G', generator,
+        f'-S', str(source_dir),
+        f'-B', str(build_dir),
+    ]
+    build_command = [
+        'cmake',
+        '--build',
+        str(build_dir),
+        '-j', str(jobs),
+    ]
+    run_command(clean_command)
+    run_command(cfg_command)
+    run_command(build_command)
 
 def generate_shared_objects(parser, num_modules):
     utility_list = []
@@ -361,7 +388,8 @@ def configure(parser):
     print('Generating driver...')
     generate_driver_file(module_file_count)
     print('Building libraries...')
-    configure_and_build_libraries()
+    configure_and_build_libraries(generator=parser.generator)
+    # configure_and_build_libraries()
     print('Done!\n')
 
     # os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
