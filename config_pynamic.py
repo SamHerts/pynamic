@@ -313,15 +313,14 @@ def generate_driver_file(num_files):
 
         with open("gen_src/pynamic_driver_mpi4py.py", "w") as f:
             f.writelines(updated_lines)
+def run_command(command):
+    try:
+        subprocess.run(command, shell=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"{command} | {e}")
+        sys.exit(1)
 
 def configure_and_build_libraries():
-    def run_command(command):
-        try:
-            subprocess.run(command, shell=True, check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"{command} | {e}")
-            sys.exit(1)
-
     run_command('rm -rf build')
     run_command('cmake -S gen_src -B build')
     run_command('cmake --build build --parallel')
@@ -330,8 +329,6 @@ def generate_shared_objects(parser, num_modules):
     utility_list = []
     extern_list = []
 
-    if parser.seed:
-        random.seed(parser.seed)
     if parser.external:
         extern_list = create_function_list(parser.num_files)
 
@@ -357,6 +354,8 @@ def generate_shared_objects(parser, num_modules):
 
 
 def configure(parser):
+    if parser.seed:
+        seed(parser.seed)
     if parser.big_exe:
         try:
             os.environ['CFLAGS'] += ' -DBUILD_PYNAMIC_BIGEXE'
@@ -372,9 +371,6 @@ def configure(parser):
     clean_pynamic_files()
     generate_shared_objects(parser, module_file_count)
 
-
-    # TODO: Archive modules, utilities, and libmodule*.o into libpynamic.a with scru
-    # TODO: Edit the pynamic_sdb file #so_generator.py:423
     print('Generating driver...')
     generate_driver_file(module_file_count)
     print('Building libraries...')
