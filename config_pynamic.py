@@ -1,18 +1,5 @@
 #! /usr/bin/env python
 
-# Please see COPYRIGHT information at the end of this file
-# File: config_pynamic.py
-# Authors: Dong H. Ahn and Greg Lee
-#
-# An addon to pyMPI, which allows dynamic library linking system
-# stress test.
-#
-# command: ./config_pynamic.py generates shared library
-#          codes, builds shared libraries using those codes, and then
-#          configures/builds pyMPI with those libraries.
-#
-
-# from so_generator import print_error, parse_and_run, run_command
 import sys
 import os
 import argparse
@@ -355,7 +342,7 @@ def generate_shared_objects(parser, num_modules):
 
 def configure(parser):
     if parser.seed:
-        seed(parser.seed)
+        random.seed(parser.seed)
     if parser.big_exe:
         try:
             os.environ['CFLAGS'] += ' -DBUILD_PYNAMIC_BIGEXE'
