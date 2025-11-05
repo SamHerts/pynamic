@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-i", metavar="python_include_dir",
                         help="Add <python_include_dir> when compiling modules")
 
-    parser.add_argument("-j", metavar="[N]", type=int, action=PositiveInt,
+    parser.add_argument("-j","--jobs", metavar="[N]", type=int, action=PositiveInt,
                         help="Build in parallel with a max of <N> processes")
 
     parser.add_argument("-n", dest="name_length", default=0, metavar="[N]", type=int, action=PositiveInt,
@@ -399,7 +399,7 @@ def configure(parser):
     print('Generating driver...')
     generate_driver_file(module_file_count)
     print('Building libraries...')
-    configure_and_build_libraries(generator=parser.generator)
+    configure_and_build_libraries(generator=parser.generator, jobs=parser.jobs)
     # configure_and_build_libraries()
     print('Done!\n')
 
