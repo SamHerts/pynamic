@@ -50,8 +50,14 @@ def test_create_function_call():
 
 def test_generate_utility_file(mocker):
     # Set up mocks
-    mock_create_list = mocker.patch("config_pynamic.create_function_list")
-    mock_create_decl = mocker.patch("config_pynamic.create_function_declaration")
+    mock_generate_function_names = mocker.patch(
+        __name__ + ".generate_function_names",
+        return_value=[
+            ("libutility1_fun0", ["int", "float", "char *"]),
+            ("libutility1_fun1", ["float", "int"])
+        ]
+    )
+    mock_create_decl = mocker.patch(__name__ + ".create_function_declaration")
     mock_create_call = mocker.patch("config_pynamic.create_function_call")
     mock_open = mocker.patch("builtins.open", mocker.mock_open())
 
@@ -59,11 +65,6 @@ def test_generate_utility_file(mocker):
     mocker.patch("random.randint", return_value=2)
     mocker.patch("random.choices", side_effect=lambda seq, k: ['1'] * k)
 
-    # Mock return values
-    mock_create_list.return_value = [
-        ["int", 2, "float", "char *"],
-        ["float", 1, "int"]
-    ]
     mock_create_decl.side_effect = lambda name, sig: f"{sig[0]} {name}({', '.join(sig[2:])})"
     mock_create_call.return_value = "int next_fun_call = next_fun();"
 
