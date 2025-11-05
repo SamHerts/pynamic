@@ -147,123 +147,134 @@ def generate_utility_file(identity: int, avg_num_functions: int, name_length: in
     filename = 'libutility' + str(identity)
     utility_list = generate_function_names(filename, avg_num_functions, name_length)
 
+    header_content = []
+    c_content = []
+
     # Generate the Header file and Function declarations
+    header_content.append('#include <stdio.h>\n#include <stdlib.h>\n\n')
+    for func_name, signature in utility_list:
+        header_content.append(create_function_declaration(func_name, signature) + ';\n')
+
+    # Generate the C File content
+    c_content.append('#include "' + filename + '.h"\n\n')
+    for index, (func_name, signature) in enumerate(utility_list):
+        c_content.append(create_function_declaration(func_name, signature) + ' {\n')
+        c_content.append('\t' + signature[0] + ' ret_val;\n')
+        c_content.append(
+            "\tint a, b, c, loop;\n"
+            "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
+            "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
+            "\tchar j[10], k[100], l[10][10];\n\n"
+        )
+
+        if print:
+            c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
+        c_content.append(
+            "\tfor (loop = 0; loop < 10; loop++)\n"
+            "\t{\n"
+            "\t\ta = loop;\n"
+            "\t}\n"
+        )
+
+        if index != len(utility_list) - 1:
+            f_call = create_function_call(utility_list[index + 1][0], utility_list[index + 1][1])
+            c_content.append('\t' + f_call + ';\n')
+        c_content.append('\treturn ret_val;\n}\n\n')
+
     with open("gen_src/" + filename + '.h', 'w') as h_file:
-        h_file.write('#include <stdio.h>\n#include <stdlib.h>\n\n')
-        for func_name, signature in utility_list:
-            h_file.write(create_function_declaration(func_name, signature) + ';\n')
-
+        h_file.writelines(header_content)
     with open("gen_src/" + filename + '.c', 'w') as c_file:
-        c_file.write('#include "' + filename + '.h"\n\n')
-        for index, (func_name, signature) in enumerate(utility_list):
-            c_file.write(create_function_declaration(func_name, signature) + ' {\n')
-            c_file.write('\t' + signature[0] + ' ret_val;\n')
-            c_file.write(
-                "\tint a, b, c, loop;\n"
-                "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
-                "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
-                "\tchar j[10], k[100], l[10][10];\n\n"
-            )
+        c_file.writelines(c_content)
 
-            if print:
-                c_file.write('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
-            c_file.write(
-                "\tfor (loop = 0; loop < 10; loop++)\n"
-                "\t{\n"
-                "\t\ta = loop;\n"
-                "\t}\n"
-            )
-
-            if index != len(utility_list) - 1:
-                f_call = create_function_call(utility_list[index + 1][0], utility_list[index + 1][1])
-                c_file.write('\t' + f_call + ';\n')
-            c_file.write('\treturn ret_val;\n}\n\n')
     return utility_list
 
 def generate_module_file(extern_list: list, utility_list: list, identity: int, avg_num_functions: int, name_length: int, print: bool = False, call_depth: int = 10):
     filename = 'libmodule' + str(identity)
     module_functions_list = generate_function_names(filename, avg_num_functions, name_length)
+    c_content = []
+
+    c_content.append('#include <Python.h>\n')
+    if utility_list:
+        c_content.append('#include "pynamic.h"\n')
+    c_content.append("\n")
+    if extern_list:
+        if identity != 0:
+            c_content.append('extern ')
+            decl = create_function_declaration( f"libmodule{identity -1}_extern", extern_list[identity - 1] )
+            c_content.append(decl + ";\n")
+        c_content.append(create_function_declaration(filename + "_extern", extern_list[identity]))
+        c_content.append(f"\n{{\n\t{extern_list[identity][0]} ret_val;")
+        if print:
+            c_content.append(f"\tprintf(\"I am {filename}_extern called from another module\\n\");\n")
+        c_content.append('\treturn ret_val;\n}\n\n')
+
+    # Create Function Declarations
+    for func_name, signature in module_functions_list:
+        c_content.append(create_function_declaration(func_name, signature) + ";\n")
+    c_content.append("\n")
+
+    # Create Function Definitions
+    for index, (func_name, signature) in enumerate(module_functions_list):
+        c_content.append(create_function_declaration(func_name, signature) + "{\n")
+        c_content.append('\t' + signature[0] + ' ret_val;\n')
+        c_content.append(
+            "\tint a, b, c, loop;\n"
+            "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
+            "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
+            "\tchar j[10], k[100], l[10][10];\n\n"
+        )
+        if print:
+            c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
+        c_content.append(
+            "\tfor (loop = 0; loop < 10; loop++)\n"
+            "\t{\n"
+            "\t\ta = loop;\n"
+        )
+
+        if utility_list:
+            utility_file = random.choice(utility_list)
+            func_name, signature = random.choice(utility_file)
+            utility_call = create_function_call( func_name, signature )
+            c_content.append("\t\t" + utility_call)
+        c_content.append("\n\t}\n")
+
+        if index != len(module_functions_list) - 1:
+            f_call = create_function_call(module_functions_list[index + 1][0], module_functions_list[index + 1][1])
+            c_content.append(f"\t{f_call}\n")
+        c_content.append('\treturn ret_val;\n}\n\n')
+
+    # Create PyObject Entry
+    entry_func_name = filename + "_entry"
+    c_content.append(f"static PyObject *py_{entry_func_name}(PyObject *self, PyObject *args){{\n")
+    c_content.append("\tint ret_val = 0;\n")
+
+    for index, (func_name, signature) in enumerate(module_functions_list):
+        if index % call_depth == 0:
+            func_call = create_function_call( func_name, signature )
+            c_content.append(f"\t{func_call}\n")
+
+    if identity != 0 and extern_list:
+        func_call = create_function_call( f"libmodule{identity - 1}_extern", extern_list[identity - 1] )
+        c_content.append(f"\t{func_call}\n")
+    c_content.append("\treturn Py_BuildValue(\"i\", ret_val);\n}\n\n")
+
+    # Initialize Python CModule
+    c_content.append(f"static PyMethodDef {filename}Methods[] = {{\n")
+    c_content.append(f"\t{{\"{entry_func_name}\", py_{entry_func_name}, METH_VARARGS, \"a function.\"}},\n")
+    c_content.append("\t{NULL, NULL, 0, NULL}\n};\n\n")
+
+    c_content.append(f"PyMODINIT_FUNC PyInit_{filename}(){{\n")
+    c_content.append(
+        "\tstatic struct PyModuleDef mod = {\n"
+        "\t\tPyModuleDef_HEAD_INIT,\n"
+    )
+    c_content.append(f"\t\t\"{filename}\",\n")
+    c_content.append("\t\t\"\",\n\t\t-1,\n")
+    c_content.append(f"\t\t{filename}Methods\n\t}};\n")
+    c_content.append("\treturn PyModule_Create(&mod);\n}\n\n")
 
     with open("gen_src/" + filename + '.c', 'w') as c_file:
-        c_file.write('#include <Python.h>\n')
-        if utility_list:
-            c_file.write('#include "pynamic.h"\n')
-        c_file.write("\n")
-        if extern_list:
-            if identity != 0:
-                c_file.write('extern ')
-                decl = create_function_declaration( f"libmodule{identity -1}_extern", extern_list[identity - 1] )
-                c_file.write(decl + ";\n")
-            c_file.write(create_function_declaration(filename + "_extern", extern_list[identity]))
-            c_file.write(f"\n{{\n\t{extern_list[identity][0]} ret_val;")
-            if print:
-                c_file.write(f"\tprintf(\"I am {filename}_extern called from another module\\n\");\n")
-            c_file.write('\treturn ret_val;\n}\n\n')
-
-        # Create Function Declarations
-        for func_name, signature in module_functions_list:
-            c_file.write(create_function_declaration(func_name, signature) + ";\n")
-        c_file.write("\n")
-
-        # Create Function Definitions
-        for index, (func_name, signature) in enumerate(module_functions_list):
-            c_file.write(create_function_declaration(func_name, signature) + "{\n")
-            c_file.write('\t' + signature[0] + ' ret_val;\n')
-            c_file.write(
-                "\tint a, b, c, loop;\n"
-                "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
-                "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
-                "\tchar j[10], k[100], l[10][10];\n\n"
-            )
-            if print:
-                c_file.write('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
-            c_file.write(
-                "\tfor (loop = 0; loop < 10; loop++)\n"
-                "\t{\n"
-                "\t\ta = loop;\n"
-            )
-
-            if utility_list:
-                utility_file = random.choice(utility_list)
-                func_name, signature = random.choice(utility_file)
-                utility_call = create_function_call( func_name, signature )
-                c_file.write("\t\t" + utility_call)
-            c_file.write("\n\t}\n")
-
-            if index != len(module_functions_list) - 1:
-                f_call = create_function_call(module_functions_list[index + 1][0], module_functions_list[index + 1][1])
-                c_file.write(f"\t{f_call}\n")
-            c_file.write('\treturn ret_val;\n}\n\n')
-
-        # Create PyObject Entry
-        entry_func_name = filename + "_entry"
-        c_file.write(f"static PyObject *py_{entry_func_name}(PyObject *self, PyObject *args){{\n")
-        c_file.write("\tint ret_val = 0;\n")
-
-        for index, (func_name, signature) in enumerate(module_functions_list):
-            if index % call_depth == 0:
-                func_call = create_function_call( func_name, signature )
-                c_file.write(f"\t{func_call}\n")
-
-        if identity != 0 and extern_list:
-            func_call = create_function_call( f"libmodule{identity - 1}_extern", extern_list[identity - 1] )
-            c_file.write(f"\t{func_call}\n")
-        c_file.write("\treturn Py_BuildValue(\"i\", ret_val);\n}\n\n")
-
-        # Initialize Python CModule
-        c_file.write(f"static PyMethodDef {filename}Methods[] = {{\n")
-        c_file.write(f"\t{{\"{entry_func_name}\", py_{entry_func_name}, METH_VARARGS, \"a function.\"}},\n")
-        c_file.write("\t{NULL, NULL, 0, NULL}\n};\n\n")
-
-        c_file.write(f"PyMODINIT_FUNC PyInit_{filename}(){{\n")
-        c_file.write(
-            "\tstatic struct PyModuleDef mod = {\n"
-            "\t\tPyModuleDef_HEAD_INIT,\n"
-        )
-        c_file.write(f"\t\t\"{filename}\",\n")
-        c_file.write("\t\t\"\",\n\t\t-1,\n")
-        c_file.write(f"\t\t{filename}Methods\n\t}};\n")
-        c_file.write("\treturn PyModule_Create(&mod);\n}\n\n")
+        c_file.writelines(c_content)
 
 def generate_driver_file(num_files):
     with open("pynamic_driver_mpi4py.py", "r") as f:
