@@ -37,8 +37,8 @@ endif()
 # Get the count of detected files
 list(LENGTH UTILITY_SOURCES NUM_U_FILES)
 list(LENGTH MODULE_SOURCES NUM_M_FILES)
-message(STATUS "Detected ${NUM_U_FILES} module files.")
-message(STATUS "Detected ${NUM_M_FILES} utility files.")
+message(STATUS "Detected ${NUM_U_FILES} utility files.")
+message(STATUS "Detected ${NUM_M_FILES} module files.")
 
 set(UTILITY_TARGETS "")
 
