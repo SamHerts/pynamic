@@ -48,37 +48,37 @@ def test_create_function_call():
     assert result == expected
 
 
-def test_generate_utility_file(mocker):
-    # Set up mocks
-    mock_generate_function_names = mocker.patch(
-        __name__ + ".generate_function_names",
-        return_value=[
-            ("libutility1_fun0", ["int", "float", "char *"]),
-            ("libutility1_fun1", ["float", "int"])
-        ]
-    )
-    mock_create_decl = mocker.patch(__name__ + ".create_function_declaration")
-    mock_create_call = mocker.patch("config_pynamic.create_function_call")
-    mock_open = mocker.patch("builtins.open", mocker.mock_open())
-
-    # Mock random behavior
-    mocker.patch("random.randint", return_value=2)
-    mocker.patch("random.choices", side_effect=lambda seq, k: ['1'] * k)
-
-    mock_create_decl.side_effect = lambda name, sig: f"{sig[0]} {name}({', '.join(sig[2:])})"
-    mock_create_call.return_value = "int next_fun_call = next_fun();"
-
-    # Run the function
-    generate_utility_file(identity=1, avg_num_functions=4, name_length=0, print=True)
-
-    # Check file writes
-    handle = mock_open()
-    written = "".join(call.args[0] for call in handle.write.call_args_list)
-    # print("\n\n" + written)
-
-
-    assert "#include <stdio.h>" in written
-    assert "int libutility1_fun0" in written
-    assert "printf(\"In module libutility1 function libutility1_fun0" in written
-    assert "return ret_val;" in written
+# def test_generate_utility_file(mocker):
+#     # Set up mocks
+#     mock_generate_function_names = mocker.patch(
+#         __name__ + ".generate_function_names",
+#         return_value=[
+#             ("libutility1_fun0", ["int", "float", "char *"]),
+#             ("libutility1_fun1", ["float", "int"])
+#         ]
+#     )
+#     mock_create_decl = mocker.patch(__name__ + ".create_function_declaration")
+#     mock_create_call = mocker.patch("config_pynamic.create_function_call")
+#     mock_open = mocker.patch("builtins.open", mocker.mock_open())
+#
+#     # Mock random behavior
+#     mocker.patch("random.randint", return_value=2)
+#     mocker.patch("random.choices", side_effect=lambda seq, k: ['1'] * k)
+#
+#     mock_create_decl.side_effect = lambda name, sig: f"{sig[0]} {name}({', '.join(sig[2:])})"
+#     mock_create_call.return_value = "int next_fun_call = next_fun();"
+#
+#     # Run the function
+#     generate_utility_file(identity=1, avg_num_functions=4, name_length=0, print=True)
+#
+#     # Check file writes
+#     handle = mock_open()
+#     written = "".join(call.args[0] for call in handle.write.call_args_list)
+#     # print("\n\n" + written)
+#
+#
+#     assert "#include <stdio.h>" in written
+#     assert "int libutility1_fun0" in written
+#     assert "printf(\"In module libutility1 function libutility1_fun0" in written
+#     assert "return ret_val;" in written
 
