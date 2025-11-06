@@ -25,9 +25,9 @@ endif()
 set(UTILITY_SOURCES "")
 set(MODULE_SOURCES "")
 
-file(GLOB UTILITY_SOURCES "libutility*.c")
-file(GLOB MODULE_SOURCES "libmodule*.c")
-set(MODULE_STATIC_SOURCES "libmodulefinal.c" "libmodulebegin.c")
+file(GLOB UTILITY_SOURCES "gen_src/libutility*.c")
+file(GLOB MODULE_SOURCES "gen_src/libmodule*.c")
+set(MODULE_STATIC_SOURCES "templates/libmodulefinal.c" "templates/libmodulebegin.c")
 
 # Check if any files were found
 if(NOT MODULE_SOURCES)
@@ -66,7 +66,7 @@ endforeach()
 
 add_library(pynamic STATIC ${UTILITY_SOURCES} ${MODULE_SOURCES} ${MODULE_STATIC_SOURCES})
 
-set(MAIN_SOURCES "mpi4py_main.c")
+set(MAIN_SOURCES "templates/mpi4py_main.c")
 
 add_executable(pynamic-mpi4py ${MAIN_SOURCES})
 target_compile_definitions(pynamic-mpi4py PRIVATE ROOT_DIR=${CMAKE_CURRENT_BINARY_DIR})
@@ -74,7 +74,7 @@ target_link_libraries(pynamic-mpi4py pynamic MPI::MPI_C Python::Python)
 
 add_custom_command( TARGET pynamic-mpi4py POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_SOURCE_DIR}/pynamic_driver_mpi4py.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/templates/pynamic_driver_mpi4py.py
             ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
     COMMENT "Copying pynamic_driver_mpi4py.py to build directory"
 )
