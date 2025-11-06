@@ -133,6 +133,15 @@ def create_function_call(function_name, function_signature)-> str:
     return f"{return_type} {function_name}_val = {function_name}({args_str});"
 
 def generate_function_names(base_name: str, avg_num_functions: int, name_length: int) -> list:
+    """
+    Args:
+        base_name: Prefix for function names.
+        avg_num_functions: Number of Functions returned
+        name_length: Number of digits appended to function name
+
+    Returns:
+        List of function names and signatures.
+    """
     num_functions = random.randint(avg_num_functions // 2, (avg_num_functions * 3) // 2)
     signatures = create_function_list(num_functions)
     digits = "0123456789"
@@ -143,183 +152,6 @@ def generate_function_names(base_name: str, avg_num_functions: int, name_length:
 
     return output
 
-def generate_utility_file(identity: int, avg_num_functions: int, name_length: int, print: bool = False):
-    filename = 'libutility' + str(identity)
-    utility_list = generate_function_names(filename, avg_num_functions, name_length)
-
-    header_content = []
-    c_content = []
-
-    # Generate the Header file and Function declarations
-    header_content.append('#include <stdio.h>\n#include <stdlib.h>\n\n')
-    for func_name, signature in utility_list:
-        header_content.append(create_function_declaration(func_name, signature) + ';\n')
-
-    # Generate the C File content
-    c_content.append('#include "' + filename + '.h"\n\n')
-    for index, (func_name, signature) in enumerate(utility_list):
-        c_content.append(create_function_declaration(func_name, signature) + ' {\n')
-        c_content.append('\t' + signature[0] + ' ret_val;\n')
-        c_content.append(
-            "\tint a, b, c, loop;\n"
-            "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
-            "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
-            "\tchar j[10], k[100], l[10][10];\n\n"
-        )
-
-        if print:
-            c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
-        c_content.append(
-            "\tfor (loop = 0; loop < 10; loop++)\n"
-            "\t{\n"
-            "\t\ta = loop;\n"
-            "\t}\n"
-        )
-
-        if index != len(utility_list) - 1:
-            f_call = create_function_call(utility_list[index + 1][0], utility_list[index + 1][1])
-            c_content.append('\t' + f_call + ';\n')
-        c_content.append('\treturn ret_val;\n}\n\n')
-
-    with open("gen_src/" + filename + '.h', 'w') as h_file:
-        h_file.writelines(header_content)
-    with open("gen_src/" + filename + '.c', 'w') as c_file:
-        c_file.writelines(c_content)
-
-    return utility_list
-
-def generate_module_file(extern_list: list, utility_list: list, identity: int, avg_num_functions: int, name_length: int, print: bool = False, call_depth: int = 10):
-    filename = 'libmodule' + str(identity)
-    module_functions_list = generate_function_names(filename, avg_num_functions, name_length)
-    c_content = []
-
-    c_content.append('#include <Python.h>\n')
-    if utility_list:
-        c_content.append('#include "pynamic.h"\n')
-    c_content.append("\n")
-    if extern_list:
-        if identity != 0:
-            c_content.append('extern ')
-            decl = create_function_declaration( f"libmodule{identity -1}_extern", extern_list[identity - 1] )
-            c_content.append(decl + ";\n")
-        c_content.append(create_function_declaration(filename + "_extern", extern_list[identity]))
-        c_content.append(f"\n{{\n\t{extern_list[identity][0]} ret_val;")
-        if print:
-            c_content.append(f"\tprintf(\"I am {filename}_extern called from another module\\n\");\n")
-        c_content.append('\treturn ret_val;\n}\n\n')
-
-    # Create Function Declarations
-    for func_name, signature in module_functions_list:
-        c_content.append(create_function_declaration(func_name, signature) + ";\n")
-    c_content.append("\n")
-
-    # Create Function Definitions
-    for index, (func_name, signature) in enumerate(module_functions_list):
-        c_content.append(create_function_declaration(func_name, signature) + "{\n")
-        c_content.append('\t' + signature[0] + ' ret_val;\n')
-        c_content.append(
-            "\tint a, b, c, loop;\n"
-            "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
-            "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
-            "\tchar j[10], k[100], l[10][10];\n\n"
-        )
-        if print:
-            c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
-        c_content.append(
-            "\tfor (loop = 0; loop < 10; loop++)\n"
-            "\t{\n"
-            "\t\ta = loop;\n"
-        )
-
-        if utility_list:
-            utility_file = random.choice(utility_list)
-            func_name, signature = random.choice(utility_file)
-            utility_call = create_function_call( func_name, signature )
-            c_content.append("\t\t" + utility_call)
-        c_content.append("\n\t}\n")
-
-        if index != len(module_functions_list) - 1:
-            f_call = create_function_call(module_functions_list[index + 1][0], module_functions_list[index + 1][1])
-            c_content.append(f"\t{f_call}\n")
-        c_content.append('\treturn ret_val;\n}\n\n')
-
-    # Create PyObject Entry
-    entry_func_name = filename + "_entry"
-    c_content.append(f"static PyObject *py_{entry_func_name}(PyObject *self, PyObject *args){{\n")
-    c_content.append("\tint ret_val = 0;\n")
-
-    for index, (func_name, signature) in enumerate(module_functions_list):
-        if index % call_depth == 0:
-            func_call = create_function_call( func_name, signature )
-            c_content.append(f"\t{func_call}\n")
-
-    if identity != 0 and extern_list:
-        func_call = create_function_call( f"libmodule{identity - 1}_extern", extern_list[identity - 1] )
-        c_content.append(f"\t{func_call}\n")
-    c_content.append("\treturn Py_BuildValue(\"i\", ret_val);\n}\n\n")
-
-    # Initialize Python CModule
-    c_content.append(f"static PyMethodDef {filename}Methods[] = {{\n")
-    c_content.append(f"\t{{\"{entry_func_name}\", py_{entry_func_name}, METH_VARARGS, \"a function.\"}},\n")
-    c_content.append("\t{NULL, NULL, 0, NULL}\n};\n\n")
-
-    c_content.append(f"PyMODINIT_FUNC PyInit_{filename}(){{\n")
-    c_content.append(
-        "\tstatic struct PyModuleDef mod = {\n"
-        "\t\tPyModuleDef_HEAD_INIT,\n"
-    )
-    c_content.append(f"\t\t\"{filename}\",\n")
-    c_content.append("\t\t\"\",\n\t\t-1,\n")
-    c_content.append(f"\t\t{filename}Methods\n\t}};\n")
-    c_content.append("\treturn PyModule_Create(&mod);\n}\n\n")
-
-    with open("gen_src/" + filename + '.c', 'w') as c_file:
-        c_file.writelines(c_content)
-
-def generate_driver_file(num_files):
-    with open("pynamic_driver_mpi4py.py", "r") as f:
-        lines = f.readlines()
-
-    updated_lines = []
-    in_import_block = False
-    in_call_block = False
-
-    for line in lines:
-        if line.strip() == '## START_MODULE_IMPORTS':
-            updated_lines.append(line)
-            in_import_block = True
-
-            for i in range(num_files):
-                updated_lines.append(f'import libmodule{i}\n')
-            continue  # Skip adding the original line, as we've replaced the block
-
-        if line.strip() == '## END_MODULE_IMPORTS':
-            in_import_block = False
-            updated_lines.append(line)  # Add the end marker
-            continue
-
-        if line.strip() == '## START_MODULE_CALLS':
-            updated_lines.append(line)
-            in_call_block = True
-            # Insert new call lines
-            for i in range(num_files):
-                updated_lines.append(f'libmodule{i}.libmodule{i}_entry()\n')
-            continue  # Skip adding the original line, as we've replaced the block
-
-        if line.strip() == '## END_MODULE_CALLS':
-            in_call_block = False
-            updated_lines.append(line)  # Add the end marker
-            continue
-
-        # If we are inside a marked block, skip the original lines
-        if in_import_block or in_call_block:
-            continue
-
-        updated_lines.append(line)
-
-        with open("gen_src/pynamic_driver_mpi4py.py", "w") as f:
-            f.writelines(updated_lines)
-
 def run_command(command):
     try:
         subprocess.run(command, shell=False, check=True)
@@ -327,7 +159,7 @@ def run_command(command):
         print(f"{command} | {e}")
         sys.exit(1)
 
-def configure_and_build_libraries(generator="Ninja", source_dir="gen_src", build_dir="build", jobs: int = 1):
+def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_dir ="build", jobs: int = 1):
     clean_command = [
         'rm',
         '-rf',
@@ -337,7 +169,6 @@ def configure_and_build_libraries(generator="Ninja", source_dir="gen_src", build
     cfg_command = [
         'cmake',
         f'-G', generator,
-        f'-S', str(source_dir),
         f'-B', str(build_dir),
     ]
     build_command = [
@@ -350,109 +181,244 @@ def configure_and_build_libraries(generator="Ninja", source_dir="gen_src", build
     run_command(cfg_command)
     run_command(build_command)
 
-def generate_shared_objects(parser, num_modules):
-    utility_list = []
-    extern_list = []
 
-    if parser.external:
-        extern_list = create_function_list(parser.num_files)
+class Pynamic:
+    def __init__(self, parser: argparse.Namespace):
+        if parser.seed:
+            random.seed(parser.seed)
+        if parser.big_exe:
+            try:
+                os.environ['CFLAGS'] += ' -DBUILD_PYNAMIC_BIGEXE'
+            except:
+                os.environ['CFLAGS'] = ' -DBUILD_PYNAMIC_BIGEXE'
+        self.num_module_files: int = parser.num_files
+        self.avg_num_functions: int = parser.avg_num_functions
+        if parser.u:
+            self.num_util_files, self.avg_num_u_functions = parser.u
+        self.module_file_count: int = max(1, self.num_module_files - self.num_util_files)
+        self.utility_list = []
+        self.extern_list = []
+        if parser.external:
+            self.extern_list = create_function_list(self.num_module_files)
+        self.print_verbose: bool = parser.print
+        self.name_length: int = parser.name_length
+        self.cmake_generator: str = parser.generator
+        self.job_count: int = parser.jobs if parser.jobs else 1
 
-    if parser.num_utility_mods:
-        print("Generating Utility Libraries")
-    for index in range(parser.num_utility_mods):
-        utility_functions = generate_utility_file(index, parser.avg_num_u_functions, parser.name_length, parser.print)
-        utility_list.append(utility_functions)
-    print("Generating Modules")
-    for index in range(num_modules):
-        generate_module_file(extern_list, utility_list, index, parser.avg_num_functions, parser.name_length, parser.print, parser.depth)
+    def generate_library_header(self):
+        with open('gen_src/pynamic.h', 'w') as py_header:
+            py_header.write('#include <math.h>\n')
+            for index in range(self.num_util_files):
+                py_header.write(f'#include "libutility{index}.h"\n')
+            py_header.write("void initlibmodulebegin();\n")
+            for index in range(self.module_file_count):
+                py_header.write(f"void initlibmodule{index}();\n")
+            py_header.write("void initlibmodulefinal();\n")
 
-    print("Generating Library Header")
-    with open('gen_src/pynamic.h', 'w') as py_header:
-        py_header.write('#include <math.h>\n')
-        for index in range(parser.num_utility_mods):
-            py_header.write(f'#include "libutility{index}.h"\n')
-        py_header.write("void initlibmodulebegin();\n")
-        for index in range(num_modules):
-            py_header.write(f"void initlibmodule{index}();\n")
-        py_header.write("void initlibmodulefinal();\n")
+    def generate_utility_file(self, identity: int):
+        filename = 'libutility' + str(identity)
+        utility_list = generate_function_names(filename, self.avg_num_u_functions, self.name_length)
 
+        header_content = []
+        c_content = []
 
+        # Generate the Header file and Function declarations
+        header_content.append('#include <stdio.h>\n#include <stdlib.h>\n\n')
+        for func_name, signature in utility_list:
+            header_content.append(create_function_declaration(func_name, signature) + ';\n')
 
-def configure(parser):
-    if parser.seed:
-        random.seed(parser.seed)
-    if parser.big_exe:
-        try:
-            os.environ['CFLAGS'] += ' -DBUILD_PYNAMIC_BIGEXE'
-        except:
-            os.environ['CFLAGS'] = ' -DBUILD_PYNAMIC_BIGEXE'
+        # Generate the C File content
+        c_content.append('#include "' + filename + '.h"\n\n')
+        for index, (func_name, signature) in enumerate(utility_list):
+            c_content.append(create_function_declaration(func_name, signature) + ' {\n')
+            c_content.append('\t' + signature[0] + ' ret_val;\n')
+            c_content.append(
+                "\tint a, b, c, loop;\n"
+                "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
+                "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
+                "\tchar j[10], k[100], l[10][10];\n\n"
+            )
 
-    if parser.u:
-        parser.num_utility_mods, parser.avg_num_u_functions = parser.u
+            if self.print_verbose:
+                c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
+            c_content.append(
+                "\tfor (loop = 0; loop < 10; loop++)\n"
+                "\t{\n"
+                "\t\ta = loop;\n"
+                "\t}\n"
+            )
 
-    module_file_count = max(1, parser.num_files - parser.num_utility_mods)
+            if index != len(utility_list) - 1:
+                f_call = create_function_call(utility_list[index + 1][0], utility_list[index + 1][1])
+                c_content.append('\t' + f_call + ';\n')
+            c_content.append('\treturn ret_val;\n}\n\n')
 
-    print("Cleaning old files...")
-    clean_pynamic_files()
-    generate_shared_objects(parser, module_file_count)
+        with open("gen_src/" + filename + '.h', 'w') as h_file:
+            h_file.writelines(header_content)
+        with open("gen_src/" + filename + '.c', 'w') as c_file:
+            c_file.writelines(c_content)
 
-    print('Generating driver...')
-    generate_driver_file(module_file_count)
-    print('Building libraries...')
-    configure_and_build_libraries(generator=parser.generator, jobs=parser.jobs)
-    # configure_and_build_libraries()
-    print('Done!\n')
+        self.utility_list.append(utility_list)
 
-    # os.environ["NUM_UTILITIES"] = str(parser.num_utility_mods)
-    # os.environ["NUM_MODULES"] = str(max(1, parser.num_files - parser.num_utility_mods))
-    # os.environ["PYTHON_EXE"] = str(parser.with_python)
+    def generate_module_file(self, identity: int, call_depth: int = 10):
+        filename = 'libmodule' + str(identity)
+        module_functions_list = generate_function_names(filename, self.avg_num_functions, self.name_length)
+        c_content = []
 
-    # TODO: Run make clean on Makefile.mpi4py
-    # command = 'make -f Makefile.mpi4py clean'
-    # run_command(command)
+        c_content.append('#include <Python.h>\n')
+        if self.utility_list:
+            c_content.append('#include "pynamic.h"\n')
+        c_content.append("\n")
+        if self.extern_list:
+            if identity != 0:
+                c_content.append('extern ')
+                decl = create_function_declaration( f"libmodule{identity -1}_extern", self.extern_list[identity - 1] )
+                c_content.append(decl + ";\n")
+            c_content.append(create_function_declaration(filename + "_extern", self.extern_list[identity]))
+            c_content.append(f"\n{{\n\t{self.extern_list[identity][0]} ret_val;")
+            if self.print_verbose:
+                c_content.append(f"\tprintf(\"I am {filename}_extern called from another module\\n\");\n")
+            c_content.append('\treturn ret_val;\n}\n\n')
 
-    # target = 'pynamic-mpi4py'
-    # if parser.big_exe == True:
-    #     target += ' pynamic-bigexe-mpi4py'
-    # TODO: Run make on Makefile.mpi4py with targets as pynamic and big_exe
-    # command = 'make -j ' + str(processes) + ' -f Makefile.mpi4py ' + target
-    # run_command(command)
-    # TODO: Move addall and get-symtab-sizes to this python file
-    # if bigexe == False:
-    #     command = 'rm -f pynamic-bigexe-pyMPI pynamic-bigexe-sdb-pyMPI pynamic-bigexe-mpi4py'
-    #     run_command(command, False)
+        # Create Function Declarations
+        for func_name, signature in module_functions_list:
+            c_content.append(create_function_declaration(func_name, signature) + ";\n")
+        c_content.append("\n")
 
-    #
-    # build the addall utility program
-    #
-    # if os.path.exists('pynamic-pyMPI-2.6a1/addall.c') != True:
-    #     print_error('required file addall.c not found!')
-    #     sys.exit(0)
-    #
-    # command = "gcc -g addall.c -o addall"
-    # run_command(command)
-    #
-    # #
-    # # check DBG, text, symbol table, and string table size.
-    # #
-    # if os.path.exists('pynamic-pyMPI-2.6a1/get-symtab-sizes') != True:
-    #     print_error('required file get-symtab-sizes not found!')
-    #     sys.exit(0)
-    #
-    # for exe in ['pynamic-pyMPI', 'pynamic-sdb-pyMPI', 'pynamic-bigexe-pyMPI', 'pynamic-bigexe-sdb-pyMPI', 'pynamic-mpi4py', 'pynamic-bigexe-mpi4py']:
-    #     info_file = 'sharedlib_section_info_%s' %(exe)
-    #     os.system('rm -f %s' %(info_file))
-    #     if os.path.exists(exe):
-    #         command = "./get-symtab-sizes %s > %s" %(exe, info_file)
-    #         ret = run_command(command)
-    #         if ret != 0:
-    #             print_error('Failed to get executable statistics for %s!' %(exe))
-    #         else:
-    #             command = "tail -10 %s" %(info_file)
-    #             run_command(command)
+        # Create Function Definitions
+        for index, (func_name, signature) in enumerate(module_functions_list):
+            c_content.append(create_function_declaration(func_name, signature) + "{\n")
+            c_content.append('\t' + signature[0] + ' ret_val;\n')
+            c_content.append(
+                "\tint a, b, c, loop;\n"
+                "\tfloat d = 0.0, e = 1.0, f = 2.0;\n"
+                "\tdouble g = 0.0, h = 3.0, i = 4.0;\n"
+                "\tchar j[10], k[100], l[10][10];\n\n"
+            )
+            if self.print_verbose:
+                c_content.append('\tprintf("In module ' + filename + ' function ' + func_name + '\\n");\n')
+            c_content.append(
+                "\tfor (loop = 0; loop < 10; loop++)\n"
+                "\t{\n"
+                "\t\ta = loop;\n"
+            )
+
+            if self.utility_list:
+                utility_file = random.choice(self.utility_list)
+                func_name, signature = random.choice(utility_file)
+                utility_call = create_function_call( func_name, signature )
+                c_content.append("\t\t" + utility_call)
+            c_content.append("\n\t}\n")
+
+            if index != len(module_functions_list) - 1:
+                f_call = create_function_call(module_functions_list[index + 1][0], module_functions_list[index + 1][1])
+                c_content.append(f"\t{f_call}\n")
+            c_content.append('\treturn ret_val;\n}\n\n')
+
+        # Create PyObject Entry
+        entry_func_name = filename + "_entry"
+        c_content.append(f"static PyObject *py_{entry_func_name}(PyObject *self, PyObject *args){{\n")
+        c_content.append("\tint ret_val = 0;\n")
+
+        for index, (func_name, signature) in enumerate(module_functions_list):
+            if index % call_depth == 0:
+                func_call = create_function_call( func_name, signature )
+                c_content.append(f"\t{func_call}\n")
+
+        if identity != 0 and self.extern_list:
+            func_call = create_function_call( f"libmodule{identity - 1}_extern", self.extern_list[identity - 1] )
+            c_content.append(f"\t{func_call}\n")
+        c_content.append("\treturn Py_BuildValue(\"i\", ret_val);\n}\n\n")
+
+        # Initialize Python CModule
+        c_content.append(f"static PyMethodDef {filename}Methods[] = {{\n")
+        c_content.append(f"\t{{\"{entry_func_name}\", py_{entry_func_name}, METH_VARARGS, \"a function.\"}},\n")
+        c_content.append("\t{NULL, NULL, 0, NULL}\n};\n\n")
+
+        c_content.append(f"PyMODINIT_FUNC PyInit_{filename}(){{\n")
+        c_content.append(
+            "\tstatic struct PyModuleDef mod = {\n"
+            "\t\tPyModuleDef_HEAD_INIT,\n"
+        )
+        c_content.append(f"\t\t\"{filename}\",\n")
+        c_content.append("\t\t\"\",\n\t\t-1,\n")
+        c_content.append(f"\t\t{filename}Methods\n\t}};\n")
+        c_content.append("\treturn PyModule_Create(&mod);\n}\n\n")
+
+        with open("gen_src/" + filename + '.c', 'w') as c_file:
+            c_file.writelines(c_content)
+
+    def generate_driver_file(self):
+        with open("templates/pynamic_driver_mpi4py.py", "r") as f:
+            lines = f.readlines()
+
+        updated_lines = []
+        in_import_block = False
+        in_call_block = False
+
+        for line in lines:
+            if line.strip() == '## START_MODULE_IMPORTS':
+                updated_lines.append(line)
+                in_import_block = True
+
+                for i in range(self.module_file_count):
+                    updated_lines.append(f'import libmodule{i}\n')
+                continue  # Skip adding the original line, as we've replaced the block
+
+            if line.strip() == '## END_MODULE_IMPORTS':
+                in_import_block = False
+                updated_lines.append(line)  # Add the end marker
+                continue
+
+            if line.strip() == '## START_MODULE_CALLS':
+                updated_lines.append(line)
+                in_call_block = True
+                # Insert new call lines
+                for i in range(self.module_file_count):
+                    updated_lines.append(f'libmodule{i}.libmodule{i}_entry()\n')
+                continue  # Skip adding the original line, as we've replaced the block
+
+            if line.strip() == '## END_MODULE_CALLS':
+                in_call_block = False
+                updated_lines.append(line)  # Add the end marker
+                continue
+
+            # If we are inside a marked block, skip the original lines
+            if in_import_block or in_call_block:
+                continue
+
+            updated_lines.append(line)
+
+        with open("gen_src/pynamic_driver_mpi4py.py", "w") as f:
+            f.writelines(updated_lines)
+
+    def configure(self):
+        print("Cleaning old files...")
+        clean_pynamic_files()
+
+        print("Generating Library Header")
+        self.generate_library_header()
+
+        if self.num_util_files:
+            print("Generating Utility Libraries...")
+            for index in range(self.num_util_files):
+                self.generate_utility_file(index)
+
+        print(f"Generating {self.module_file_count} Modules {'using ' + str(self.job_count) + ' jobs' if self.job_count > 1 else ''}...")
+        with mp.Pool(processes=self.job_count) as pool:
+            pool.map(self.generate_module_file, range(self.module_file_count))
+
+        print('Generating driver')
+        self.generate_driver_file()
+
+        print('Building libraries')
+        configure_and_build_libraries(generator=self.cmake_generator, jobs=self.job_count)
+        print('Done!\n')
+
 
 if __name__ == '__main__':
-    configure(parse_args())
+    configurator = Pynamic(parse_args())
+    configurator.configure()
 #
 #COPYRIGHT
 #
