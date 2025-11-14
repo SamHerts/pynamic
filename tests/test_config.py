@@ -8,7 +8,7 @@ from config_pynamic import *
 def set_random_seed():
     random.seed(42)
 
-def test_function_list():
+def test_create_function_list():
     result = create_function_list(3)
     expected = [
         ['int', 0],
@@ -17,7 +17,7 @@ def test_function_list():
     ]
     assert result == expected
 
-def test_function_name_creation():
+def test_generate_function_names():
     base_name = "my_base_name"
     avg_num_functions = 10
     name_length = 0
