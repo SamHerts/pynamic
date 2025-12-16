@@ -73,6 +73,8 @@ def clean_pynamic_files() -> None:
         OSError: If issues occur during file deletion.
     """
     top_dir = Path('./gen_src')
+    if not top_dir.exists():
+        top_dir.mkdir()
     for file in top_dir.iterdir():
         if file.is_file():
             name = file.name
