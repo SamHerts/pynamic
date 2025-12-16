@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-u", nargs=2, type=int, default=(0,0), metavar=('num_utility_mods', 'avg_num_u_functions'),
                         help="Create utility modules with an average number of functions")
 
-    parser.add_argument("-G", "--generator", type=str, default="Ninja", help="Compile C Modules with <G> generator.")
+    parser.add_argument("-G", "--generator", type=str, default="Unix Makefiles", help="Compile C Modules with <G> generator. (Ninja runs faster)")
 
     parser.add_argument("--with-cc", metavar="[command]",
                         help="Use the C compiler located at <command> to build Pynamic modules")
