@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-e","--external", action="store_true",
                         help="Enable external functions to call across modules")
 
-    parser.add_argument("-i", metavar="python_include_dir",
+    parser.add_argument("-i" "--include", metavar="python_include_dir",
                         help="Add <python_include_dir> when compiling modules")
 
     parser.add_argument("-j","--jobs", metavar="[N]", type=int, action=PositiveInt,
@@ -161,7 +161,7 @@ def run_command(command):
         print(f"{command} | {e}")
         sys.exit(1)
 
-def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_dir ="build", jobs: int = 1):
+def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_dir ="build", jobs: int = 1, python_dir=None):
     clean_command = [
         'rm',
         '-rf',
@@ -172,6 +172,7 @@ def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_d
         'cmake',
         f'-G', generator,
         f'-B', str(build_dir),
+        f'-DPython_ROOT_DIR={python_dir}' if python_dir else "",
     ]
     build_command = [
         'cmake',
@@ -206,6 +207,7 @@ class Pynamic:
         self.name_length: int = parser.name_length
         self.cmake_generator: str = parser.generator
         self.job_count: int = parser.jobs if parser.jobs else 1
+        self.python_dir = parser.include
 
     def generate_library_header(self):
         with open('gen_src/pynamic.h', 'w') as py_header:
@@ -414,7 +416,7 @@ class Pynamic:
         self.generate_driver_file()
 
         print('Building libraries')
-        configure_and_build_libraries(generator=self.cmake_generator, jobs=self.job_count)
+        configure_and_build_libraries(generator=self.cmake_generator, jobs=self.job_count, python_dir=self.python_dir)
         print('Done!\n')
 
 
