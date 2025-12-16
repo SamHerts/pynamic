@@ -207,7 +207,7 @@ class Pynamic:
         self.name_length: int = parser.name_length
         self.cmake_generator: str = parser.generator
         self.job_count: int = parser.jobs if parser.jobs else 1
-        self.python_dir = parser.include
+        self.python_dir = parser.i__include
 
     def generate_library_header(self):
         with open('gen_src/pynamic.h', 'w') as py_header:
