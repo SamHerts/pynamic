@@ -28,7 +28,7 @@ PyMODINIT_FUNC PyInit_libmodulebegin()
 {
    static struct PyModuleDef beginmodule = {
       PyModuleDef_HEAD_INIT,
-      "libmodulebeign",
+      "libmodulebegin",
       "",
       -1,
       libmodulebegin_importMethods
