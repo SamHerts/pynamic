@@ -85,7 +85,7 @@ target_link_libraries(pynamic-mpi4py pynamic MPI::MPI_C Python::Python)
 
 add_custom_command( TARGET pynamic-mpi4py POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-            ${CMAKE_CURRENT_SOURCE_DIR}/templates/pynamic_driver_mpi4py.py
+            ${CMAKE_CURRENT_SOURCE_DIR}/gen_src/pynamic_driver_mpi4py.py
             ${CMAKE_CURRENT_BINARY_DIR}/pynamic_driver_mpi4py.py
     COMMENT "Copying pynamic_driver_mpi4py.py to build directory"
 )
