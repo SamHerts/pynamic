@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("-e","--external", action="store_true",
                         help="Enable external functions to call across modules")
 
-    parser.add_argument("-i" "--include", metavar="python_include_dir",
+    parser.add_argument("-i", "--include", metavar="python_include_dir",
                         help="Add <python_include_dir> when compiling modules")
 
     parser.add_argument("-j","--jobs", metavar="[N]", type=int, action=PositiveInt,
@@ -207,7 +207,7 @@ class Pynamic:
         self.name_length: int = parser.name_length
         self.cmake_generator: str = parser.generator
         self.job_count: int = parser.jobs if parser.jobs else 1
-        self.python_dir = parser.i__include
+        self.python_dir = parser.include
 
     def generate_library_header(self):
         with open('gen_src/pynamic.h', 'w') as py_header:
