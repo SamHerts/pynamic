@@ -30,7 +30,7 @@ myRank = mpi.rank
 nProcs = mpi.procs
 if myRank == 0:
     print('Pynamic: Version 1.3.3')
-    print('Pynamic: run on %s with %s MPI tasks\\n' %(time.strftime("%x %X"), nProcs))
+    print('Pynamic: run on %s with %s MPI tasks\n' %(time.strftime("%x %X"), nProcs))
     if len(sys.argv) > 1:
         start_time = float(sys.argv[1])
         print('Pynamic: startup time = ' + str(end_time - start_time) + ' secs')
@@ -59,12 +59,12 @@ if myRank == 0:
     call_time = call_end - call_start
     print('Pynamic: module import time = ' + str(import_time) + ' secs')
     print('Pynamic: module visit time = ' + str(call_time) + ' secs')
-    print('Pynamic: module test passed!\\n')
+    print('Pynamic: module test passed!\n')
 if mpi_avail == False:
     sys.exit(0)
 
 if myRank == 0:
-    print('Pynamic: testing mpi capability...\\n')
+    print('Pynamic: testing mpi capability...\n')
     mpi_start = time.time()
 
 ## START_EXAMPLE - If examples need to be modified, do so here
@@ -176,5 +176,5 @@ if mpi.rank == 0:
 mpi.barrier()
 if myRank == 0:
     mpi_end = time.time()
-    print('\\nPynamic: fractal mpi time = ' + str(mpi_end - mpi_start) + ' secs')
-    print('Pynamic: mpi test passed!\\n')
+    print('\nPynamic: fractal mpi time = ' + str(mpi_end - mpi_start) + ' secs')
+    print('Pynamic: mpi test passed!\n')
