@@ -1,0 +1,79 @@
+#!/bin/bash
+#SBATCH --job-name=pynamic_scaling
+#SBATCH --account=csc266
+#SBATCH --time=30:00
+#SBATCH --nodes=20
+#SBATCH --output=%j_pynamic_scaling.out
+#SBATCH --error=%j_pynamic_scaling.err
+
+RESULTS="pynamic_results_${SLURM_JOB_ID}.txt"
+NODELOG="pynamic_nodes_${SLURM_JOB_ID}.txt"
+
+# Visit times above this threshold (seconds) are classified as anomalous
+VISIT_THRESHOLD=100
+
+# Expand the job's node allocation into an ordered array
+ALLNODES=($(scontrol show hostnames "$SLURM_JOB_NODELIST"))
+
+echo "Job ${SLURM_JOB_ID} node allocation:" > "$NODELOG"
+printf '  %s\n' "${ALLNODES[@]}" >> "$NODELOG"
+echo "" >> "$NODELOG"
+
+printf "%-8s %-25s %-25s %s\n" "Nodes" "Import Time (s)" "Visit Time (s)" "Nodes Used" > "$RESULTS"
+printf "%-8s %-25s %-25s %s\n" "-----" "---------------" "--------------" "----------" >> "$RESULTS"
+
+declare -a ANOMALOUS_NODES
+declare -a CLEAN_NODES
+
+for N in 1 2 4 8 12 16 18 20; do
+    # Deterministically select the first N nodes from the allocation
+    SUBSET_ARR=("${ALLNODES[@]:0:$N}")
+    SUBSET=$(IFS=,; echo "${SUBSET_ARR[*]}")
+
+    OUTPUT=$(srun --nodelist="$SUBSET" -N "$N" --ntasks-per-node 1 \
+        build/pynamic-mpi4py $(date +%s) 2>&1)
+
+    IMPORT_TIME=$(echo "$OUTPUT" | grep "module import time" | awk '{print $6}')
+    VISIT_TIME=$(echo "$OUTPUT"  | grep "module visit time"  | awk '{print $6}')
+
+    printf "%-8s %-25s %-25s %s\n" "$N" "$IMPORT_TIME" "$VISIT_TIME" "$SUBSET" >> "$RESULTS"
+    echo "Done: N=$N | import=$IMPORT_TIME | visit=$VISIT_TIME"
+
+    IS_ANOMALY=$(awk -v vt="${VISIT_TIME:-0}" -v thr="$VISIT_THRESHOLD" \
+        'BEGIN { print (vt+0 > thr) ? "yes" : "no" }')
+
+    if [[ "$IS_ANOMALY" == "yes" ]]; then
+        printf "N=%-3s [ANOMALY] %s\n" "$N" "$SUBSET" >> "$NODELOG"
+        ANOMALOUS_NODES+=("${SUBSET_ARR[@]}")
+    else
+        printf "N=%-3s [ok]      %s\n" "$N" "$SUBSET" >> "$NODELOG"
+        CLEAN_NODES+=("${SUBSET_ARR[@]}")
+    fi
+done
+
+echo "" >> "$NODELOG"
+echo "=== Suspect Node Analysis ===" >> "$NODELOG"
+
+if [[ ${#ANOMALOUS_NODES[@]} -eq 0 ]]; then
+    echo "No anomalies detected." >> "$NODELOG"
+else
+    echo "Node appearances in anomalous runs:" >> "$NODELOG"
+    printf '%s\n' "${ANOMALOUS_NODES[@]}" | sort | uniq -c | sort -rn >> "$NODELOG"
+
+    echo "" >> "$NODELOG"
+    echo "Node appearances in clean runs:" >> "$NODELOG"
+    printf '%s\n' "${CLEAN_NODES[@]}" | sort | uniq -c | sort -rn >> "$NODELOG"
+
+    echo "" >> "$NODELOG"
+    echo "Nodes present in anomalous runs but absent from all clean runs (primary suspects):" >> "$NODELOG"
+    comm -23 \
+        <(printf '%s\n' "${ANOMALOUS_NODES[@]}" | sort -u) \
+        <(printf '%s\n' "${CLEAN_NODES[@]}"      | sort -u) >> "$NODELOG"
+fi
+
+echo ""
+echo "=== Results ==="
+cat "$RESULTS"
+echo ""
+echo "=== Node Analysis ==="
+cat "$NODELOG"
