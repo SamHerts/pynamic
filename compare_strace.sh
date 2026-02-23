@@ -17,6 +17,7 @@ NODE1="defiant1"
 NODE19="defiant19"
 TOP_N=10
 
+BUILD_DIR="$(pwd)/build"
 SRUN_BASE="srun -A stf008 -t 5:00 -N 1 --ntasks-per-node 1"
 
 REPORT="${OUTDIR}/report.txt"
@@ -33,12 +34,14 @@ echo ""
 echo "Capturing strace on ${NODE1} and ${NODE19} in parallel..."
 
 $SRUN_BASE --nodelist="$NODE1" \
-    strace -e trace=openat,mmap,mprotect -T python3 -c "import ${MODULE}" \
+    strace -e trace=openat,mmap,mprotect -T \
+    env PYTHONPATH="${BUILD_DIR}" python3 -c "import ${MODULE}" \
     >"${OUTDIR}/${NODE1}_stdout.txt" 2>"${OUTDIR}/${NODE1}_strace.txt" &
 PID1=$!
 
 $SRUN_BASE --nodelist="$NODE19" \
-    strace -e trace=openat,mmap,mprotect -T python3 -c "import ${MODULE}" \
+    strace -e trace=openat,mmap,mprotect -T \
+    env PYTHONPATH="${BUILD_DIR}" python3 -c "import ${MODULE}" \
     >"${OUTDIR}/${NODE19}_stdout.txt" 2>"${OUTDIR}/${NODE19}_strace.txt" &
 PID19=$!
 

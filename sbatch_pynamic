@@ -3,6 +3,7 @@
 #SBATCH --account=csc266
 #SBATCH --time=30:00
 #SBATCH --nodes=20
+#SBATCH --exclude=node19
 #SBATCH --output=%j_pynamic_scaling.out
 #SBATCH --error=%j_pynamic_scaling.err
 
