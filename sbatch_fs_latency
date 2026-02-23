@@ -1,0 +1,98 @@
+#!/bin/bash
+#SBATCH --job-name=pynamic_fs_latency
+#SBATCH --account=csc266
+#SBATCH --time=30:00
+#SBATCH --nodes=20
+#SBATCH --output=%j_fs_latency.out
+#SBATCH --error=%j_fs_latency.err
+
+# Measures the time to 'ls -la build/*.so | wc -l' on every allocated node.
+# Each node is tested N_RUNS times; results are averaged and sorted slowest-first.
+# Intentionally omits --exclude so node19 is included in the allocation.
+
+BUILD_DIR="$(pwd)/build"
+N_RUNS=5
+
+TMPDIR_RESULTS=$(mktemp -d)
+OUTPUT="fs_latency_${SLURM_JOB_ID}.txt"
+
+ALLNODES=($(scontrol show hostnames "$SLURM_JOB_NODELIST"))
+
+echo "FS latency check — job ${SLURM_JOB_ID}"
+echo "Build dir : ${BUILD_DIR}"
+echo "Nodes     : ${#ALLNODES[@]}"
+echo "Runs/node : ${N_RUNS}"
+echo ""
+
+# ---------------------------------------------------------------------------
+# check_node <node> <build_dir> <n_runs> <outfile>
+#   Runs the ls timing test n_runs times on the given node, writes one line:
+#   "<node> <avg_s> <min_s> <max_s> <successful_runs>" to outfile.
+# ---------------------------------------------------------------------------
+check_node() {
+    local node="$1"
+    local build_dir="$2"
+    local n_runs="$3"
+    local outfile="$4"
+
+    local total=0
+    local count=0
+    local -a times=()
+
+    for run in $(seq 1 "$n_runs"); do
+        # 'time' writes to stderr; redirect the group's stderr to stdout to capture it.
+        # srun stdout (the wc -l count) is discarded — we only care about timing here.
+        timing=$( { time srun --nodelist="$node" -N 1 --ntasks-per-node 1 \
+            bash -c "ls -la '${build_dir}'/*.so | wc -l" > /dev/null ; } 2>&1 )
+
+        # Parse "real\t0m1.234s" → fractional seconds
+        real=$(echo "$timing" | grep '^real' | awk '{print $2}')
+        if [[ -n "$real" ]]; then
+            sec=$(echo "$real" | awk -F'[ms]' '{printf "%.6f", $1*60 + $2}')
+            times+=("$sec")
+            total=$(awk "BEGIN {printf \"%.6f\", ${total} + ${sec}}")
+            ((count++))
+        fi
+    done
+
+    if [[ $count -gt 0 ]]; then
+        avg=$(awk "BEGIN {printf \"%.3f\", ${total} / ${count}}")
+        min=$(printf '%s\n' "${times[@]}" | sort -n | head -1)
+        max=$(printf '%s\n' "${times[@]}" | sort -n | tail -1)
+    else
+        avg="ERR"; min="ERR"; max="ERR"
+    fi
+
+    echo "${node} ${avg} ${min} ${max} ${count}" > "$outfile"
+}
+
+# Launch one background job per node so all 20 run in parallel
+for node in "${ALLNODES[@]}"; do
+    check_node "$node" "$BUILD_DIR" "$N_RUNS" "${TMPDIR_RESULTS}/${node}.txt" &
+done
+
+wait
+echo "All node checks complete."
+echo ""
+
+# Collect results from per-node temp files
+declare -a results
+for node in "${ALLNODES[@]}"; do
+    f="${TMPDIR_RESULTS}/${node}.txt"
+    if [[ -f "$f" ]]; then
+        results+=("$(cat "$f")")
+    else
+        results+=("$node ERR ERR ERR 0")
+    fi
+done
+
+# Print table sorted slowest average first
+printf "%-12s %-14s %-14s %-14s %s\n" "Node" "Avg (s)" "Min (s)" "Max (s)" "Runs"
+printf "%-12s %-14s %-14s %-14s %s\n" "----" "-------" "-------" "-------" "----"
+printf '%s\n' "${results[@]}" | sort -k2 -rn | while read -r node avg min max runs; do
+    printf "%-12s %-14s %-14s %-14s %s/%s\n" "$node" "$avg" "$min" "$max" "$runs" "$N_RUNS"
+done | tee "$OUTPUT"
+
+rm -rf "$TMPDIR_RESULTS"
+echo ""
+echo "Results saved to ${OUTPUT}"
