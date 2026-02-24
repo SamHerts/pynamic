@@ -2,8 +2,8 @@
 #SBATCH --job-name=pynamic_scaling
 #SBATCH --account=csc266
 #SBATCH --time=30:00
-#SBATCH --nodes=20
-#SBATCH --exclude=node19
+#SBATCH --nodes=19
+#SBATCH --exclude=defiant19
 #SBATCH --output=%j_pynamic_scaling.out
 #SBATCH --error=%j_pynamic_scaling.err
 
@@ -15,7 +15,7 @@ ALLNODES=($(scontrol show hostnames "$SLURM_JOB_NODELIST"))
 printf "%-8s %-25s %-25s\n" "Nodes" "Import Time (s)" "Visit Time (s)" > "$RESULTS"
 printf "%-8s %-25s %-25s\n" "-----" "---------------" "--------------" >> "$RESULTS"
 
-for N in 1 2 4 8 12 16 18 20; do
+for N in {1..19}; do
     # Deterministically select the first N nodes from the allocation
     SUBSET_ARR=("${ALLNODES[@]:0:$N}")
     SUBSET=$(IFS=,; echo "${SUBSET_ARR[*]}")
