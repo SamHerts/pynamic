@@ -161,7 +161,7 @@ def run_command(command):
         print(f"{command} | {e}")
         sys.exit(1)
 
-def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_dir ="build", jobs: int = 1, python_dir=None):
+def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_dir ="build", jobs: int = 1, python_dir=None, cc=None):
     clean_command = [
         'rm',
         '-rf',
@@ -172,8 +172,12 @@ def configure_and_build_libraries(generator: str, source_dir ="gen_src", build_d
         'cmake',
         f'-G', generator,
         f'-B', str(build_dir),
-        f'-DPython_ROOT_DIR={python_dir}' if python_dir else "",
     ]
+    if python_dir:
+        cfg_command.append(f'-DPython_ROOT_DIR={python_dir}')
+    if cc:
+        cfg_command.append(f'-DCMAKE_C_COMPILER={cc}')
+
     build_command = [
         'cmake',
         '--build',
@@ -207,7 +211,8 @@ class Pynamic:
         self.name_length: int = parser.name_length
         self.cmake_generator: str = parser.generator
         self.job_count: int = parser.jobs if parser.jobs else 1
-        self.python_dir = parser.include
+        self.python_dir = parser.with_python or parser.include
+        self.cc = parser.with_cc
 
     def generate_library_header(self):
         with open('gen_src/pynamic.h', 'w') as py_header:
@@ -416,7 +421,7 @@ class Pynamic:
         self.generate_driver_file()
 
         print('Building libraries')
-        configure_and_build_libraries(generator=self.cmake_generator, jobs=self.job_count, python_dir=self.python_dir)
+        configure_and_build_libraries(generator=self.cmake_generator, jobs=self.job_count, python_dir=self.python_dir, cc=self.cc)
         print('Done!\n')
 
 
