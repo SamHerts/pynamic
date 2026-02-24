@@ -12,22 +12,33 @@ RESULTS="pynamic_results_${SLURM_JOB_ID}.txt"
 # Expand the job's node allocation into an ordered array
 ALLNODES=($(scontrol show hostnames "$SLURM_JOB_NODELIST"))
 
-printf "%-8s %-25s %-25s %s\n" "Nodes" "Import Time (s)" "Visit Time (s)" "Nodes Used" > "$RESULTS"
-printf "%-8s %-25s %-25s %s\n" "-----" "---------------" "--------------" "----------" >> "$RESULTS"
+printf "%-8s %-25s %-25s\n" "Nodes" "Import Time (s)" "Visit Time (s)" > "$RESULTS"
+printf "%-8s %-25s %-25s\n" "-----" "---------------" "--------------" >> "$RESULTS"
 
 for N in 1 2 4 8 12 16 18 20; do
     # Deterministically select the first N nodes from the allocation
     SUBSET_ARR=("${ALLNODES[@]:0:$N}")
     SUBSET=$(IFS=,; echo "${SUBSET_ARR[*]}")
 
-    OUTPUT=$(srun --nodelist="$SUBSET" -N "$N" --ntasks-per-node 1 \
-        build/pynamic-mpi4py $(date +%s) 2>&1)
+    SUM_IMPORT=0
+    SUM_VISIT=0
+    for RUN in 1 2 3 4 5; do
+        OUTPUT=$(srun --nodelist="$SUBSET" -N "$N" --ntasks-per-node 1 \
+            build/pynamic-mpi4py $(date +%s) 2>&1)
 
-    IMPORT_TIME=$(echo "$OUTPUT" | grep "module import time" | awk '{print $6}')
-    VISIT_TIME=$(echo "$OUTPUT"  | grep "module visit time"  | awk '{print $6}')
+        IMPORT_TIME=$(echo "$OUTPUT" | grep "module import time" | awk '{print $6}')
+        VISIT_TIME=$(echo "$OUTPUT"  | grep "module visit time"  | awk '{print $6}')
 
-    printf "%-8s %-25s %-25s %s\n" "$N" "$IMPORT_TIME" "$VISIT_TIME" "$SUBSET" >> "$RESULTS"
-    echo "Done: N=$N | import=$IMPORT_TIME | visit=$VISIT_TIME"
+        SUM_IMPORT=$(awk "BEGIN {print $SUM_IMPORT + $IMPORT_TIME}")
+        SUM_VISIT=$(awk  "BEGIN {print $SUM_VISIT  + $VISIT_TIME}")
+        echo "  Run $RUN/5: N=$N | import=$IMPORT_TIME | visit=$VISIT_TIME"
+    done
+
+    AVG_IMPORT=$(awk "BEGIN {printf \"%.6f\", $SUM_IMPORT / 5}")
+    AVG_VISIT=$(awk  "BEGIN {printf \"%.6f\", $SUM_VISIT  / 5}")
+
+    printf "%-8s %-25s %-25s\n" "$N" "$AVG_IMPORT" "$AVG_VISIT" >> "$RESULTS"
+    echo "Done: N=$N | avg_import=$AVG_IMPORT | avg_visit=$AVG_VISIT"
 done
 
 echo ""
